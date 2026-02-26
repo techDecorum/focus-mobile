@@ -1,13 +1,14 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
   stakeAmount: number;
+  txSignature: string | null;
   onReset: () => void;
 }
 
-export default function AbandonedScreen({ stakeAmount, onReset }: Props) {
+export default function AbandonedScreen({ stakeAmount, txSignature, onReset }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.icon}>◌</Text>
@@ -15,16 +16,22 @@ export default function AbandonedScreen({ stakeAmount, onReset }: Props) {
       <Text style={styles.subtitle}>Even Bond retreats to fight another day.</Text>
 
       <View style={styles.card}>
-        {[
-          { label: 'Penalty', value: `-${(stakeAmount * 0.2).toFixed(3)} SOL`, color: '#f87171' },
-          { label: 'Returned', value: `+${(stakeAmount * 0.8).toFixed(3)} SOL`, color: '#4dd9ac' },
-          { label: 'Streak', value: 'Reset to zero', color: '#2a7a5e' },
-        ].map((item, i) => (
-          <View key={i} style={styles.row}>
-            <Text style={styles.rowLabel}>{item.label}</Text>
-            <Text style={[styles.rowValue, { color: item.color }]}>{item.value}</Text>
-          </View>
-        ))}
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Penalty</Text>
+          <Text style={[styles.rowValue, { color: '#f87171' }]}>
+            -{(stakeAmount * 0.2).toFixed(3)} SOL
+          </Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Returned</Text>
+          <Text style={[styles.rowValue, { color: '#4dd9ac' }]}>
+            +{(stakeAmount * 0.8).toFixed(3)} SOL
+          </Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Streak</Text>
+          <Text style={[styles.rowValue, { color: '#2a7a5e' }]}>Reset to zero</Text>
+        </View>
       </View>
 
       <LinearGradient
@@ -37,6 +44,14 @@ export default function AbandonedScreen({ stakeAmount, onReset }: Props) {
           <Text style={styles.buttonText}>Try Again</Text>
         </TouchableOpacity>
       </LinearGradient>
+
+      {txSignature && (
+        <TouchableOpacity onPress={() =>
+          Linking.openURL(`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`)
+        }>
+          <Text style={styles.explorerLink}>View transaction on Solana Explorer →</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -63,4 +78,5 @@ const styles = StyleSheet.create({
   button: { borderRadius: 16, width: '100%' },
   buttonInner: { padding: 20, alignItems: 'center' },
   buttonText: { color: '#060d12', fontSize: 16, fontWeight: '700' },
+  explorerLink: { color: '#2a7a5e', fontSize: 12, marginTop: 16 },
 });

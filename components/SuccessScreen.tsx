@@ -1,14 +1,16 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
   duration: number;
   stakeAmount: number;
+  poolReward: number;
+  txSignature: string | null;
   onReset: () => void;
 }
 
-export default function SuccessScreen({ duration, stakeAmount, onReset }: Props) {
+export default function SuccessScreen({ duration, stakeAmount, poolReward, txSignature, onReset }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.star}>✦</Text>
@@ -16,17 +18,20 @@ export default function SuccessScreen({ duration, stakeAmount, onReset }: Props)
       <Text style={styles.subtitle}>Mission complete. Your SOL is returned.</Text>
 
       <View style={styles.card}>
-        {[
-          { label: 'Duration', value: `${duration} minutes` },
-          { label: 'SOL Returned', value: `${stakeAmount} SOL`, color: '#4dd9ac' },
-        ].map((item, i) => (
-          <View key={i} style={styles.row}>
-            <Text style={styles.rowLabel}>{item.label}</Text>
-            <Text style={[styles.rowValue, item.color ? { color: item.color } : {}]}>
-              {item.value}
-            </Text>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>Duration</Text>
+          <Text style={styles.rowValue}>{duration} minutes</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.rowLabel}>SOL Returned</Text>
+          <Text style={[styles.rowValue, { color: '#4dd9ac' }]}>{stakeAmount} SOL</Text>
+        </View>
+        {poolReward > 0 && (
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Pool Bonus</Text>
+            <Text style={[styles.rowValue, { color: '#fbbf24' }]}>+{poolReward.toFixed(4)} SOL 🎉</Text>
           </View>
-        ))}
+        )}
       </View>
 
       <LinearGradient
@@ -39,6 +44,14 @@ export default function SuccessScreen({ duration, stakeAmount, onReset }: Props)
           <Text style={styles.buttonText}>Begin Another Session</Text>
         </TouchableOpacity>
       </LinearGradient>
+
+      {txSignature && (
+        <TouchableOpacity onPress={() =>
+          Linking.openURL(`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`)
+        }>
+          <Text style={styles.explorerLink}>View transaction on Solana Explorer →</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -65,4 +78,5 @@ const styles = StyleSheet.create({
   button: { borderRadius: 16, width: '100%' },
   buttonInner: { padding: 20, alignItems: 'center' },
   buttonText: { color: '#060d12', fontSize: 16, fontWeight: '700' },
+  explorerLink: { color: '#2a7a5e', fontSize: 12, marginTop: 16 },
 });

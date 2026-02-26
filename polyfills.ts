@@ -1,7 +1,7 @@
+import 'react-native-get-random-values';
 import { Buffer } from 'buffer';
 global.Buffer = Buffer;
 
-// Event polyfill for Solana web3.js
 if (typeof global.Event === 'undefined') {
   global.Event = class Event {
     type: string;

@@ -1,45 +1,20 @@
-import {
-    transact,
-    Web3MobileWallet,
-  } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
- 
+import { useConnection } from '@solana/wallet-adapter-react';
+import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
+import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
-    onStart: (duration: number, stakeAmount: number) => void;
-  }
+  onStart: (duration: number, stakeAmount: number, publicKey: PublicKey) => void;
+}
 
 export default function HomeScreen({ onStart }: Props) {
+  const { connection } = useConnection();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [solBalance, setSolBalance] = useState<number | null>(null);
   const [duration, setDuration] = useState(25);
   const [stakeAmount, setStakeAmount] = useState(0.01);
-
-  const handleConnect = async () => {
-    try {
-      const authResult = await transact(async (wallet: Web3MobileWallet) => {
-        const authorizationResult = await wallet.authorize({
-          cluster: 'devnet',
-          identity: {
-            name: 'Focus',
-            uri: 'https://focus-app-orpin.vercel.app',
-            icon: '/favicon.ico',
-          },
-        });
-        return authorizationResult;
-      });
-      setWalletAddress(authResult.accounts[0].address);
-    } catch (err: any) {
-      console.log('Wallet connection cancelled:', err.message);
-    }
-  };
 
   const DURATIONS = [
     { mins: 1, label: '1', sub: 'Quick Start' },
@@ -50,29 +25,74 @@ export default function HomeScreen({ onStart }: Props) {
     { mins: 50, label: '50', sub: 'Deep Work' },
   ];
 
+  const fetchBalance = async (address: string) => {
+    try {
+      let pubkey: PublicKey;
+      try {
+        pubkey = new PublicKey(Buffer.from(address, 'base64'));
+      } catch {
+        pubkey = new PublicKey(address);
+      }
+      const balance = await connection.getBalance(pubkey);
+      setSolBalance(balance / LAMPORTS_PER_SOL);
+    } catch (err) {
+      console.log('Balance fetch failed:', err);
+    }
+  };
+
+  const handleConnect = async () => {
+    try {
+      const authResult = await transact(async (wallet: Web3MobileWallet) => {
+        return await wallet.authorize({
+          cluster: 'devnet',
+          identity: {
+            name: 'Focus',
+            uri: 'https://focus-app-orpin.vercel.app',
+            icon: '/favicon.ico',
+          },
+        });
+      });
+      setWalletAddress(authResult.accounts[0].address);
+      fetchBalance(authResult.accounts[0].address);
+    } catch (err: any) {
+      console.log('Wallet connection cancelled:', err.message);
+    }
+  };
+
+  const handleStart = () => {
+    if (!walletAddress) return alert('Connect your Phantom wallet first!');
+    try {
+      const pubkey = new PublicKey(Buffer.from(walletAddress, 'base64'));
+      onStart(duration, stakeAmount, pubkey);
+    } catch {
+      const pubkey = new PublicKey(walletAddress);
+      onStart(duration, stakeAmount, pubkey);
+    }
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Hero */}
       <View style={styles.hero}>
         <Text style={styles.label}>READY TO FOCUS</Text>
         <Text style={styles.title}>Begin your session</Text>
         <Text style={styles.subtitle}>Stake SOL. Focus. Earn it back.</Text>
       </View>
 
-      {/* Wallet */}
       {!walletAddress ? (
         <TouchableOpacity style={styles.walletButton} onPress={handleConnect}>
           <Text style={styles.walletButtonText}>Connect Phantom Wallet</Text>
         </TouchableOpacity>
       ) : (
         <View style={styles.walletConnected}>
-          <Text style={styles.walletAddress}>
+          <Text style={styles.walletAddressText}>
             {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
           </Text>
+          {solBalance !== null && (
+            <Text style={styles.solBalance}>{solBalance.toFixed(4)} SOL</Text>
+          )}
         </View>
       )}
 
-      {/* Duration */}
       <View style={styles.card}>
         <Text style={styles.cardLabel}>SESSION DURATION</Text>
         <View style={styles.durationGrid}>
@@ -80,22 +100,17 @@ export default function HomeScreen({ onStart }: Props) {
             <TouchableOpacity
               key={d.mins}
               onPress={() => setDuration(d.mins)}
-              style={[
-                styles.durationButton,
-                duration === d.mins && styles.durationButtonActive,
-              ]}
+              style={[styles.durationButton, duration === d.mins && styles.durationButtonActive]}
             >
-              <Text style={[
-                styles.durationLabel,
-                duration === d.mins && styles.durationLabelActive,
-              ]}>{d.label}</Text>
+              <Text style={[styles.durationLabel, duration === d.mins && styles.durationLabelActive]}>
+                {d.label}
+              </Text>
               <Text style={styles.durationSub}>{d.sub}</Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Stake */}
       <View style={styles.card}>
         <View style={styles.cardRow}>
           <Text style={styles.cardLabel}>STAKE AMOUNT</Text>
@@ -106,30 +121,25 @@ export default function HomeScreen({ onStart }: Props) {
             <TouchableOpacity
               key={amount}
               onPress={() => setStakeAmount(amount)}
-              style={[
-                styles.stakeButton,
-                stakeAmount === amount && styles.stakeButtonActive,
-              ]}
+              style={[styles.stakeButton, stakeAmount === amount && styles.stakeButtonActive]}
             >
-              <Text style={[
-                styles.stakeButtonText,
-                stakeAmount === amount && styles.stakeButtonTextActive,
-              ]}>{amount}</Text>
+              <Text style={[styles.stakeButtonText, stakeAmount === amount && styles.stakeButtonTextActive]}>
+                {amount}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
       </View>
 
-      {/* Start Button */}
       <LinearGradient
         colors={['#2a7a5e', '#4dd9ac']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.startButton}
       >
-        <TouchableOpacity onPress={() => onStart(duration, stakeAmount)} style={styles.startButtonInner}>
-  <Text style={styles.startButtonText}>Begin Focus Session</Text>
-</TouchableOpacity>
+        <TouchableOpacity onPress={handleStart} style={styles.startButtonInner}>
+          <Text style={styles.startButtonText}>Begin Focus Session</Text>
+        </TouchableOpacity>
       </LinearGradient>
 
       <Text style={styles.disclaimer}>
@@ -156,7 +166,8 @@ const styles = StyleSheet.create({
     padding: 12, alignItems: 'center', marginBottom: 24,
     backgroundColor: 'rgba(77,217,172,0.05)',
   },
-  walletAddress: { color: '#4dd9ac', fontSize: 12 },
+  walletAddressText: { color: '#4dd9ac', fontSize: 12 },
+  solBalance: { color: '#4dd9ac', fontSize: 16, fontWeight: '600', marginTop: 4 },
   card: {
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
     borderRadius: 16, padding: 20, marginBottom: 16,
@@ -169,9 +180,7 @@ const styles = StyleSheet.create({
     width: '30%', padding: 16, borderRadius: 12, alignItems: 'center',
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
   },
-  durationButtonActive: {
-    borderColor: '#4dd9ac', backgroundColor: 'rgba(77,217,172,0.1)',
-  },
+  durationButtonActive: { borderColor: '#4dd9ac', backgroundColor: 'rgba(77,217,172,0.1)' },
   durationLabel: { color: '#2a7a5e', fontSize: 24, fontWeight: '300' },
   durationLabelActive: { color: '#4dd9ac' },
   durationSub: { color: '#2a7a5e', fontSize: 10, marginTop: 2 },
