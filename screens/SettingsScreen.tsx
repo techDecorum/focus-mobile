@@ -1,30 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Switch } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useTheme } from '../contexts/ThemeContext';
 
 const TRACKS = [
-  { index: 0,  name: 'Deep Focus',    emoji: '🧠', description: 'Beta · 14Hz' },
-  { index: 1,  name: 'Flow State',    emoji: '🌊', description: 'Alpha · 10Hz' },
-  { index: 2,  name: 'Deep Work',     emoji: '⚡', description: 'Gamma · 40Hz' },
-  { index: 3,  name: 'Calm Focus',    emoji: '🧘', description: 'Theta · 6Hz' },
-  { index: 4,  name: 'Memory',        emoji: '💡', description: 'Beta · 12Hz' },
-  { index: 5,  name: 'Meditation',    emoji: '☯️', description: 'Delta · 4Hz' },
-  { index: 6,  name: 'Energy Boost',  emoji: '🚀', description: 'Beta · 20Hz' },
-  { index: 7,  name: 'Sleep Prep',    emoji: '🌙', description: 'Delta · 2Hz' },
-  { index: 8,  name: 'Dusty Jazz',    emoji: '🎷', description: 'Jazz · 90s' },
-  { index: 9,  name: 'Mellow Drift',  emoji: '🌿', description: 'Ambient' },
-  { index: 10, name: 'Deep Long Study', emoji: '📚', description: 'Deep' },
-  { index: 11, name: 'Spacious Motifs', emoji: '🌌', description: 'Ambient' },
-  { index: 12, name: 'Quiet Focus',   emoji: '🕊️', description: 'Calm' },
-  { index: 13, name: 'Deep Focus Piano', emoji: '🖤', description: 'Piano' },
-  { index: 14, name: 'Mind Memory',   emoji: '🔮', description: 'Ambient' },
+  { index: 0,  name: 'Deep Focus',          emoji: '🧠', description: 'Beta · 14Hz' },
+  { index: 1,  name: 'Flow State',           emoji: '🌊', description: 'Alpha · 10Hz' },
+  { index: 2,  name: 'Deep Work',            emoji: '⚡', description: 'Gamma · 40Hz' },
+  { index: 3,  name: 'Calm Focus',           emoji: '🧘', description: 'Theta · 6Hz' },
+  { index: 4,  name: 'Memory',               emoji: '💡', description: 'Beta · 12Hz' },
+  { index: 5,  name: 'Meditation',           emoji: '☯️', description: 'Delta · 4Hz' },
+  { index: 6,  name: 'Energy Boost',         emoji: '🚀', description: 'Beta · 20Hz' },
+  { index: 7,  name: 'Sleep Prep',           emoji: '🌙', description: 'Delta · 2Hz' },
+  { index: 8,  name: 'Dusty Jazz',           emoji: '🎷', description: 'Jazz · 90s' },
+  { index: 9,  name: 'Mellow Drift',         emoji: '🌿', description: 'Ambient' },
+  { index: 10, name: 'Deep Long Study',      emoji: '📚', description: 'Deep' },
+  { index: 11, name: 'Spacious Motifs',      emoji: '🌌', description: 'Ambient' },
+  { index: 12, name: 'Quiet Focus',          emoji: '🕊️', description: 'Calm' },
+  { index: 13, name: 'Deep Focus Piano',     emoji: '🖤', description: 'Piano' },
+  { index: 14, name: 'Mind Memory',          emoji: '🔮', description: 'Ambient' },
   { index: 15, name: 'Gentle Concentration', emoji: '🌸', description: 'Meditation' },
-  { index: 16, name: 'Moments Peaceful', emoji: '☁️', description: 'Ambient' },
-  { index: 17, name: 'Glass Shore',   emoji: '🌅', description: 'Ambient' },
-  { index: 18, name: 'Midnight Sleep', emoji: '🌃', description: 'Sleep' },
+  { index: 16, name: 'Moments Peaceful',     emoji: '☁️', description: 'Ambient' },
+  { index: 17, name: 'Glass Shore',          emoji: '🌅', description: 'Ambient' },
+  { index: 18, name: 'Midnight Sleep',       emoji: '🌃', description: 'Sleep' },
 ];
 
 export default function SettingsScreen() {
+  const { theme, colors, toggleTheme } = useTheme();
   const [displayName, setDisplayName] = useState('');
   const [editingName, setEditingName] = useState(false);
   const [defaultTrack, setDefaultTrack] = useState(0);
@@ -48,12 +50,7 @@ export default function SettingsScreen() {
 
   const saveSettings = async (overrides = {}) => {
     try {
-      const settings = {
-        displayName,
-        defaultTrack,
-        sessionReminders,
-        ...overrides,
-      };
+      const settings = { displayName, defaultTrack, sessionReminders, ...overrides };
       await AsyncStorage.setItem('focus_settings', JSON.stringify(settings));
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -66,54 +63,51 @@ export default function SettingsScreen() {
       'This will permanently delete all your session history. Are you sure?',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Clear',
-          style: 'destructive',
-          onPress: async () => {
-            await AsyncStorage.removeItem('focus_history');
-            Alert.alert('Done', 'Session history cleared.');
-          },
-        },
+        { text: 'Clear', style: 'destructive', onPress: async () => {
+          await AsyncStorage.removeItem('focus_history');
+          Alert.alert('Done', 'Session history cleared.');
+        }},
       ]
     );
   };
 
   const selectedTrack = TRACKS[defaultTrack] || TRACKS[0];
+  const c = colors;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.pageLabel}>SETTINGS</Text>
-      <Text style={styles.pageTitle}>Preferences</Text>
+    <ScrollView style={[styles.container, { backgroundColor: c.bg }]} contentContainerStyle={styles.content}>
+      <Text style={[styles.pageLabel, { color: c.textSub }]}>SETTINGS</Text>
+      <Text style={[styles.pageTitle, { color: c.text }]}>Preferences</Text>
 
       {/* Profile */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>PROFILE</Text>
-        <View style={styles.card}>
-          <Text style={styles.fieldLabel}>Display Name</Text>
+        <Text style={[styles.sectionLabel, { color: c.textSub }]}>PROFILE</Text>
+        <View style={[styles.card, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
+          <Text style={[styles.fieldLabel, { color: c.textSub }]}>Display Name</Text>
           {editingName ? (
             <View style={styles.nameEditRow}>
               <TextInput
-                style={styles.nameInput}
+                style={[styles.nameInput, { color: c.text, borderBottomColor: c.accent }]}
                 value={displayName}
                 onChangeText={setDisplayName}
                 placeholder="Enter your name..."
-                placeholderTextColor="#1a4a35"
+                placeholderTextColor={c.textMuted}
                 autoFocus
                 maxLength={30}
                 returnKeyType="done"
                 onSubmitEditing={() => { setEditingName(false); saveSettings(); }}
               />
               <TouchableOpacity
-                style={styles.saveNameBtn}
+                style={[styles.saveNameBtn, { backgroundColor: `${c.accent}22`, borderColor: c.accent }]}
                 onPress={() => { setEditingName(false); saveSettings(); }}
               >
-                <Text style={styles.saveNameBtnText}>Save</Text>
+                <Text style={[styles.saveNameBtnText, { color: c.accent }]}>Save</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <TouchableOpacity style={styles.nameRow} onPress={() => setEditingName(true)}>
-              <Text style={styles.nameValue}>{displayName || 'Tap to set name...'}</Text>
-              <Text style={styles.editHint}>✎</Text>
+              <Text style={[styles.nameValue, { color: c.text }]}>{displayName || 'Tap to set name...'}</Text>
+              <Text style={[styles.editHint, { color: c.textSub }]}>✎</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -121,38 +115,34 @@ export default function SettingsScreen() {
 
       {/* Default Track */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>DEFAULT FOCUS TRACK</Text>
+        <Text style={[styles.sectionLabel, { color: c.textSub }]}>DEFAULT FOCUS TRACK</Text>
         <TouchableOpacity
-          style={styles.card}
+          style={[styles.card, { backgroundColor: c.card, borderColor: c.cardBorder }]}
           onPress={() => setTrackExpanded(!trackExpanded)}
         >
           <View style={styles.trackRow}>
             <Text style={styles.trackEmoji}>{selectedTrack.emoji}</Text>
             <View style={styles.trackInfo}>
-              <Text style={styles.trackName}>{selectedTrack.name}</Text>
-              <Text style={styles.trackDesc}>{selectedTrack.description}</Text>
+              <Text style={[styles.trackName, { color: c.text }]}>{selectedTrack.name}</Text>
+              <Text style={[styles.trackDesc, { color: c.textSub }]}>{selectedTrack.description}</Text>
             </View>
-            <Text style={styles.chevron}>{trackExpanded ? '▲' : '▼'}</Text>
+            <Text style={[styles.chevron, { color: c.textSub }]}>{trackExpanded ? '▲' : '▼'}</Text>
           </View>
         </TouchableOpacity>
 
         {trackExpanded && (
-          <View style={styles.trackList}>
+          <View style={[styles.trackList, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
             {TRACKS.map(track => (
               <TouchableOpacity
                 key={track.index}
-                style={[styles.trackOption, defaultTrack === track.index && styles.trackOptionActive]}
-                onPress={() => {
-                  setDefaultTrack(track.index);
-                  setTrackExpanded(false);
-                  saveSettings({ defaultTrack: track.index });
-                }}
+                style={[styles.trackOption, { borderBottomColor: c.cardBorder }, defaultTrack === track.index && { backgroundColor: `${c.accent}15` }]}
+                onPress={() => { setDefaultTrack(track.index); setTrackExpanded(false); saveSettings({ defaultTrack: track.index }); }}
               >
                 <Text style={styles.trackOptionEmoji}>{track.emoji}</Text>
-                <Text style={[styles.trackOptionName, defaultTrack === track.index && styles.trackOptionNameActive]}>
+                <Text style={[styles.trackOptionName, { color: c.textMuted }, defaultTrack === track.index && { color: c.accent }]}>
                   {track.name}
                 </Text>
-                {defaultTrack === track.index && <Text style={styles.checkmark}>✓</Text>}
+                {defaultTrack === track.index && <Text style={[styles.checkmark, { color: c.accent }]}>✓</Text>}
               </TouchableOpacity>
             ))}
           </View>
@@ -161,113 +151,107 @@ export default function SettingsScreen() {
 
       {/* Notifications */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>NOTIFICATIONS</Text>
-        <View style={styles.card}>
+        <Text style={[styles.sectionLabel, { color: c.textSub }]}>NOTIFICATIONS</Text>
+        <View style={[styles.card, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
           <View style={styles.switchRow}>
             <View style={styles.switchInfo}>
-              <Text style={styles.switchLabel}>Session Reminders</Text>
-              <Text style={styles.switchDesc}>Remind me to focus daily</Text>
+              <Text style={[styles.switchLabel, { color: c.text }]}>Session Reminders</Text>
+              <Text style={[styles.switchDesc, { color: c.textSub }]}>Remind me to focus daily</Text>
             </View>
             <Switch
               value={sessionReminders}
-              onValueChange={(val) => {
-                setSessionReminders(val);
-                saveSettings({ sessionReminders: val });
-              }}
-              trackColor={{ false: 'rgba(255,255,255,0.1)', true: 'rgba(77,217,172,0.4)' }}
-              thumbColor={sessionReminders ? '#4dd9ac' : '#2a7a5e'}
+              onValueChange={(val) => { setSessionReminders(val); saveSettings({ sessionReminders: val }); }}
+              trackColor={{ false: 'rgba(128,128,128,0.2)', true: `${c.accent}66` }}
+              thumbColor={sessionReminders ? c.accent : '#888'}
             />
           </View>
         </View>
       </View>
 
-      {/* Danger Zone */}
+      {/* Appearance */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>DATA</Text>
+        <Text style={[styles.sectionLabel, { color: c.textSub }]}>APPEARANCE</Text>
+        <View style={[styles.card, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
+          <View style={styles.switchRow}>
+            <View style={styles.switchInfo}>
+              <Text style={[styles.switchLabel, { color: c.text }]}>
+                {theme === 'dark' ? '🌙 Dark Theme' : '☀️ Light Theme'}
+              </Text>
+              <Text style={[styles.switchDesc, { color: c.textSub }]}>
+                {theme === 'dark' ? 'Easy on the eyes at night' : 'Clean and bright'}
+              </Text>
+            </View>
+            <Switch
+              value={theme === 'light'}
+              onValueChange={toggleTheme}
+              trackColor={{ false: 'rgba(128,128,128,0.2)', true: `${c.accent}66` }}
+              thumbColor={theme === 'light' ? c.accent : '#888'}
+            />
+          </View>
+        </View>
+      </View>
+
+      {/* Data */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: c.textSub }]}>DATA</Text>
         <TouchableOpacity style={styles.dangerCard} onPress={handleClearHistory}>
           <Text style={styles.dangerText}>🗑 Clear Session History</Text>
           <Text style={styles.dangerDesc}>Permanently delete all past sessions</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Saved toast */}
       {saved && (
-        <View style={styles.savedToast}>
-          <Text style={styles.savedToastText}>✓ Settings saved</Text>
+        <View style={[styles.savedToast, { backgroundColor: `${c.accent}22`, borderColor: c.accent }]}>
+          <Text style={[styles.savedToastText, { color: c.accent }]}>✓ Settings saved</Text>
         </View>
       )}
 
-      <Text style={styles.version}>Focus · Built on Solana Devnet</Text>
+      <Text style={[styles.version, { color: c.textMuted }]}>Focus v1.1.0 · Built on Solana Devnet</Text>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#060d12' },
+  container: { flex: 1 },
   content: { padding: 24, paddingTop: 60, paddingBottom: 60 },
-  pageLabel: { color: '#2a7a5e', fontSize: 11, letterSpacing: 3, marginBottom: 8 },
-  pageTitle: { color: '#f0faf6', fontSize: 28, fontWeight: 'bold', marginBottom: 32 },
+  pageLabel: { fontSize: 11, letterSpacing: 3, marginBottom: 8 },
+  pageTitle: { fontSize: 28, fontWeight: 'bold', marginBottom: 32 },
   section: { marginBottom: 28 },
-  sectionLabel: { color: '#2a7a5e', fontSize: 10, letterSpacing: 3, marginBottom: 10 },
-  card: {
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 16, padding: 18,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
-  fieldLabel: { color: '#2a7a5e', fontSize: 11, letterSpacing: 1, marginBottom: 10 },
+  sectionLabel: { fontSize: 10, letterSpacing: 3, marginBottom: 10 },
+  card: { borderWidth: 1, borderRadius: 16, padding: 18 },
+  fieldLabel: { fontSize: 11, letterSpacing: 1, marginBottom: 10 },
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  nameValue: { color: '#f0faf6', fontSize: 16 },
-  editHint: { color: '#2a7a5e', fontSize: 18 },
+  nameValue: { fontSize: 16 },
+  editHint: { fontSize: 18 },
   nameEditRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  nameInput: {
-    flex: 1, color: '#f0faf6', fontSize: 16,
-    borderBottomWidth: 1, borderBottomColor: '#4dd9ac',
-    paddingVertical: 4,
-  },
-  saveNameBtn: {
-    backgroundColor: 'rgba(77,217,172,0.15)',
-    borderWidth: 1, borderColor: '#4dd9ac',
-    borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6,
-  },
-  saveNameBtnText: { color: '#4dd9ac', fontSize: 13, fontWeight: '600' },
+  nameInput: { flex: 1, fontSize: 16, borderBottomWidth: 1, paddingVertical: 4 },
+  saveNameBtn: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
+  saveNameBtnText: { fontSize: 13, fontWeight: '600' },
   trackRow: { flexDirection: 'row', alignItems: 'center' },
   trackEmoji: { fontSize: 22, marginRight: 12 },
   trackInfo: { flex: 1 },
-  trackName: { color: '#f0faf6', fontSize: 15, fontWeight: '500' },
-  trackDesc: { color: '#2a7a5e', fontSize: 11, marginTop: 2 },
-  chevron: { color: '#2a7a5e', fontSize: 12 },
-  trackList: {
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 16, marginTop: 8, overflow: 'hidden',
-    backgroundColor: 'rgba(255,255,255,0.02)',
-  },
-  trackOption: {
-    flexDirection: 'row', alignItems: 'center',
-    padding: 14, borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
-  },
-  trackOptionActive: { backgroundColor: 'rgba(77,217,172,0.08)' },
+  trackName: { fontSize: 15, fontWeight: '500' },
+  trackDesc: { fontSize: 11, marginTop: 2 },
+  chevron: { fontSize: 12 },
+  trackList: { borderWidth: 1, borderRadius: 16, marginTop: 8, overflow: 'hidden' },
+  trackOption: { flexDirection: 'row', alignItems: 'center', padding: 14, borderBottomWidth: 1 },
   trackOptionEmoji: { fontSize: 18, marginRight: 12, width: 28 },
-  trackOptionName: { flex: 1, color: '#6b7280', fontSize: 14 },
-  trackOptionNameActive: { color: '#4dd9ac' },
-  checkmark: { color: '#4dd9ac', fontSize: 16 },
+  trackOptionName: { flex: 1, fontSize: 14 },
+  checkmark: { fontSize: 16 },
   switchRow: { flexDirection: 'row', alignItems: 'center' },
   switchInfo: { flex: 1 },
-  switchLabel: { color: '#f0faf6', fontSize: 15, fontWeight: '500' },
-  switchDesc: { color: '#2a7a5e', fontSize: 11, marginTop: 3 },
+  switchLabel: { fontSize: 15, fontWeight: '500' },
+  switchDesc: { fontSize: 11, marginTop: 3 },
   dangerCard: {
     borderWidth: 1, borderColor: 'rgba(248,113,113,0.2)',
-    borderRadius: 16, padding: 18,
-    backgroundColor: 'rgba(248,113,113,0.04)',
+    borderRadius: 16, padding: 18, backgroundColor: 'rgba(248,113,113,0.04)',
   },
   dangerText: { color: '#f87171', fontSize: 15, fontWeight: '500' },
   dangerDesc: { color: 'rgba(248,113,113,0.5)', fontSize: 11, marginTop: 4 },
   savedToast: {
     position: 'absolute', bottom: 80, alignSelf: 'center',
-    backgroundColor: 'rgba(77,217,172,0.15)',
-    borderWidth: 1, borderColor: '#4dd9ac',
-    borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10,
+    borderWidth: 1, borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10,
   },
-  savedToastText: { color: '#4dd9ac', fontSize: 13, fontWeight: '600' },
-  version: { color: '#1a4a35', fontSize: 11, textAlign: 'center', marginTop: 16 },
+  savedToastText: { fontSize: 13, fontWeight: '600' },
+  version: { fontSize: 11, textAlign: 'center', marginTop: 16 },
 });

@@ -1,9 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal, PanResponder } from 'react-native';
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal } from 'react-native';
+import { Audio } from 'expo-av';
 import TrackVisualizer, { getVibeFromDescription } from '../components/TrackVisualizer';
+import { useTheme } from '../contexts/ThemeContext';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const BINAURAL_TRACKS = [
   { index: 0,  name: 'Deep Focus',    emoji: '🧠', description: 'Beta · 14Hz · Concentration',    file: require('../assets/audio/deep_focus.mp3') },
@@ -33,39 +34,13 @@ const PIANO_TRACKS = [
 const ALL_TRACKS = [...BINAURAL_TRACKS, ...PIANO_TRACKS];
 type Track = typeof ALL_TRACKS[0];
 
-const SEEK_BAR_WIDTH = width - 48;
-
-const formatTime = (ms: number) => {
-  const totalSecs = Math.floor(ms / 1000);
-  const mins = Math.floor(totalSecs / 60);
-  const secs = totalSecs % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
-};
-
 export default function LibraryScreen() {
+  const { colors } = useTheme();
+  const c = colors;
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playerOpen, setPlayerOpen] = useState(false);
-  const [positionMs, setPositionMs] = useState(0);
-  const [durationMs, setDurationMs] = useState(0);
-  const [isSeeking, setIsSeeking] = useState(false);
-  const [seekPosition, setSeekPosition] = useState(0);
   const soundRef = useRef<Audio.Sound | null>(null);
-
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      if (soundRef.current && isPlaying && !isSeeking) {
-        try {
-          const status = await soundRef.current.getStatusAsync() as AVPlaybackStatus;
-          if (status.isLoaded) {
-            setPositionMs(status.positionMillis);
-            setDurationMs(status.durationMillis ?? 0);
-          }
-        } catch {}
-      }
-    }, 500);
-    return () => clearInterval(interval);
-  }, [isPlaying, isSeeking]);
 
   const stopAudio = async () => {
     try {
@@ -76,8 +51,6 @@ export default function LibraryScreen() {
       }
     } catch {}
     setIsPlaying(false);
-    setPositionMs(0);
-    setDurationMs(0);
   };
 
   const loadAndPlay = async (track: Track) => {
@@ -96,11 +69,6 @@ export default function LibraryScreen() {
       soundRef.current = sound;
       setCurrentTrack(track);
       setIsPlaying(true);
-      setPositionMs(0);
-      const status = await sound.getStatusAsync() as AVPlaybackStatus;
-      if (status.isLoaded && status.durationMillis) {
-        setDurationMs(status.durationMillis);
-      }
     } catch (err) {
       console.log('Playback error:', err);
     }
@@ -119,39 +87,11 @@ export default function LibraryScreen() {
     } catch {}
   };
 
-  const handleSeek = async (ratio: number) => {
-    if (!soundRef.current || !durationMs) return;
-    try {
-      await soundRef.current.setPositionAsync(Math.floor(ratio * durationMs));
-      setPositionMs(Math.floor(ratio * durationMs));
-    } catch {}
-  };
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        setIsSeeking(true);
-        setSeekPosition(Math.max(0, Math.min(1, evt.nativeEvent.locationX / SEEK_BAR_WIDTH)));
-      },
-      onPanResponderMove: (evt) => {
-        setSeekPosition(Math.max(0, Math.min(1, evt.nativeEvent.locationX / SEEK_BAR_WIDTH)));
-      },
-      onPanResponderRelease: (evt) => {
-        const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / SEEK_BAR_WIDTH));
-        setSeekPosition(ratio);
-        setIsSeeking(false);
-        handleSeek(ratio);
-      },
-    })
-  ).current;
-
-  const progress = isSeeking ? seekPosition : durationMs > 0 ? positionMs / durationMs : 0;
-
   const handleTrackTap = (track: Track) => {
     setPlayerOpen(true);
-    if (currentTrack?.index !== track.index) loadAndPlay(track);
+    if (currentTrack?.index !== track.index) {
+      loadAndPlay(track);
+    }
   };
 
   const handlePrev = () => {
@@ -177,16 +117,28 @@ export default function LibraryScreen() {
     return (
       <TouchableOpacity
         key={track.index}
-        style={[styles.trackCard, isActive && styles.trackCardActive]}
+        style={[
+          styles.trackCard,
+          { backgroundColor: c.card, borderColor: c.cardBorder },
+          isActive && { borderColor: `${c.accent}55`, backgroundColor: `${c.accent}10` },
+        ]}
         onPress={() => handleTrackTap(track)}
       >
         <Text style={styles.trackEmoji}>{track.emoji}</Text>
         <View style={styles.trackInfo}>
-          <Text style={[styles.trackName, isActive && styles.trackNameActive]}>{track.name}</Text>
-          <Text style={styles.trackDesc}>{track.description}</Text>
+          <Text style={[styles.trackName, { color: c.textMuted }, isActive && { color: c.accent }]}>
+            {track.name}
+          </Text>
+          <Text style={[styles.trackDesc, { color: c.textMuted }]}>{track.description}</Text>
         </View>
-        <View style={[styles.playBtn, isActive && styles.playBtnActive]}>
-          <Text style={styles.playBtnText}>{isActive && isPlaying ? '❚❚' : '▶'}</Text>
+        <View style={[
+          styles.playBtn,
+          { borderColor: c.cardBorder },
+          isActive && { borderColor: c.accent, backgroundColor: `${c.accent}22` },
+        ]}>
+          <Text style={[styles.playBtnText, { color: c.accent }]}>
+            {isActive && isPlaying ? '❚❚' : '▶'}
+          </Text>
         </View>
       </TouchableOpacity>
     );
@@ -194,31 +146,38 @@ export default function LibraryScreen() {
 
   return (
     <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.pageLabel}>MUSIC LIBRARY</Text>
-        <Text style={styles.pageTitle}>Focus Sounds</Text>
-        <Text style={styles.pageSub}>{ALL_TRACKS.length} tracks · Tap to open visual player</Text>
+      <ScrollView style={[styles.container, { backgroundColor: c.bg }]} contentContainerStyle={styles.content}>
+        <Text style={[styles.pageLabel, { color: c.textSub }]}>MUSIC LIBRARY</Text>
+        <Text style={[styles.pageTitle, { color: c.text }]}>Focus Sounds</Text>
+        <Text style={[styles.pageSub, { color: c.textSub }]}>{ALL_TRACKS.length} tracks · Tap to open visual player</Text>
 
+        {/* Now Playing Bar */}
         {currentTrack && !playerOpen && (
-          <TouchableOpacity style={styles.nowPlaying} onPress={() => setPlayerOpen(true)}>
+          <TouchableOpacity
+            style={[styles.nowPlaying, { backgroundColor: `${c.accent}10`, borderColor: `${c.accent}44` }]}
+            onPress={() => setPlayerOpen(true)}
+          >
             <Text style={styles.nowPlayingEmoji}>{currentTrack.emoji}</Text>
             <View style={styles.nowPlayingInfo}>
-              <Text style={styles.nowPlayingLabel}>NOW PLAYING · TAP TO OPEN</Text>
-              <Text style={styles.nowPlayingName}>{currentTrack.name}</Text>
+              <Text style={[styles.nowPlayingLabel, { color: c.textSub }]}>NOW PLAYING · TAP TO OPEN</Text>
+              <Text style={[styles.nowPlayingName, { color: c.accent }]}>{currentTrack.name}</Text>
             </View>
             <TouchableOpacity onPress={handleClosePlayer} style={styles.stopButton}>
-              <Text style={styles.stopButtonText}>■</Text>
+              <Text style={[styles.stopButtonText, { color: c.accent }]}>■</Text>
             </TouchableOpacity>
           </TouchableOpacity>
         )}
 
-        <Text style={styles.sectionLabel}>BINAURAL BEATS</Text>
+        <Text style={[styles.sectionLabel, { color: c.textSub }]}>BINAURAL BEATS</Text>
         {BINAURAL_TRACKS.map(renderTrack)}
-        <Text style={[styles.sectionLabel, { marginTop: 24 }]}>PIANO & AMBIENT</Text>
+
+        <Text style={[styles.sectionLabel, { color: c.textSub, marginTop: 24 }]}>PIANO & AMBIENT</Text>
         {PIANO_TRACKS.map(renderTrack)}
-        <Text style={styles.footer}>🎧 Use headphones for best binaural beat experience</Text>
+
+        <Text style={[styles.footer, { color: c.textMuted }]}>🎧 Use headphones for best binaural beat experience</Text>
       </ScrollView>
 
+      {/* Full Screen Visual Player */}
       <Modal visible={playerOpen} animationType="slide" statusBarTranslucent>
         <View style={styles.player}>
           {currentTrack && (
@@ -232,20 +191,6 @@ export default function LibraryScreen() {
               <Text style={styles.playerEmoji}>{currentTrack?.emoji}</Text>
               <Text style={styles.playerName}>{currentTrack?.name}</Text>
               <Text style={styles.playerDesc}>{currentTrack?.description}</Text>
-
-              {/* Seek Bar */}
-              <View style={styles.seekContainer}>
-                <View style={styles.seekBar} {...panResponder.panHandlers}>
-                  <View style={styles.seekTrack} />
-                  <View style={[styles.seekFill, { width: `${progress * 100}%` }]} />
-                  <View style={[styles.seekThumb, { left: `${progress * 100}%` }]} />
-                </View>
-                <View style={styles.seekTimes}>
-                  <Text style={styles.seekTime}>{formatTime(isSeeking ? seekPosition * durationMs : positionMs)}</Text>
-                  <Text style={styles.seekTime}>{durationMs ? formatTime(durationMs) : '--:--'}</Text>
-                </View>
-              </View>
-
               <View style={styles.controls}>
                 <TouchableOpacity style={styles.prevBtn} onPress={handlePrev}>
                   <Text style={styles.controlText}>⏮</Text>
@@ -266,44 +211,36 @@ export default function LibraryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#060d12' },
+  container: { flex: 1 },
   content: { padding: 24, paddingTop: 60, paddingBottom: 40 },
-  pageLabel: { color: '#2a7a5e', fontSize: 11, letterSpacing: 3, marginBottom: 8 },
-  pageTitle: { color: '#f0faf6', fontSize: 28, fontWeight: 'bold', marginBottom: 8 },
-  pageSub: { color: '#2a7a5e', fontSize: 13, marginBottom: 24 },
+  pageLabel: { fontSize: 11, letterSpacing: 3, marginBottom: 8 },
+  pageTitle: { fontSize: 28, fontWeight: 'bold', marginBottom: 8 },
+  pageSub: { fontSize: 13, marginBottom: 24 },
   nowPlaying: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: 'rgba(77,217,172,0.08)',
-    borderWidth: 1, borderColor: 'rgba(77,217,172,0.3)',
-    borderRadius: 14, padding: 14, marginBottom: 24,
+    borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 24,
   },
   nowPlayingEmoji: { fontSize: 24, marginRight: 12 },
   nowPlayingInfo: { flex: 1 },
-  nowPlayingLabel: { color: '#2a7a5e', fontSize: 9, letterSpacing: 2 },
-  nowPlayingName: { color: '#4dd9ac', fontSize: 15, fontWeight: '600', marginTop: 2 },
+  nowPlayingLabel: { fontSize: 9, letterSpacing: 2 },
+  nowPlayingName: { fontSize: 15, fontWeight: '600', marginTop: 2 },
   stopButton: { padding: 8 },
-  stopButtonText: { color: '#4dd9ac', fontSize: 16 },
-  sectionLabel: { color: '#2a7a5e', fontSize: 10, letterSpacing: 3, marginBottom: 12 },
+  stopButtonText: { fontSize: 16 },
+  sectionLabel: { fontSize: 10, letterSpacing: 3, marginBottom: 12 },
   trackCard: {
     flexDirection: 'row', alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 14, padding: 16, marginBottom: 10,
-    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderWidth: 1, borderRadius: 14, padding: 16, marginBottom: 10,
   },
-  trackCardActive: { borderColor: 'rgba(77,217,172,0.3)', backgroundColor: 'rgba(77,217,172,0.06)' },
   trackEmoji: { fontSize: 24, marginRight: 14 },
   trackInfo: { flex: 1 },
-  trackName: { color: '#6b7280', fontSize: 15, fontWeight: '500' },
-  trackNameActive: { color: '#4dd9ac' },
-  trackDesc: { color: '#1a4a35', fontSize: 11, marginTop: 3 },
+  trackName: { fontSize: 15, fontWeight: '500' },
+  trackDesc: { fontSize: 11, marginTop: 3 },
   playBtn: {
     width: 36, height: 36, borderRadius: 18,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)',
-    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
   },
-  playBtnActive: { borderColor: '#4dd9ac', backgroundColor: 'rgba(77,217,172,0.15)' },
-  playBtnText: { color: '#4dd9ac', fontSize: 12 },
-  footer: { color: '#1a4a35', fontSize: 12, textAlign: 'center', marginTop: 24 },
+  playBtnText: { fontSize: 12 },
+  footer: { fontSize: 12, textAlign: 'center', marginTop: 24 },
   player: { flex: 1, backgroundColor: '#060d12' },
   playerOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -320,28 +257,7 @@ const styles = StyleSheet.create({
   playerInfo: { alignItems: 'center', paddingBottom: 40 },
   playerEmoji: { fontSize: 56, marginBottom: 16 },
   playerName: { color: '#f0faf6', fontSize: 26, fontWeight: 'bold', textAlign: 'center' },
-  playerDesc: { color: '#2a7a5e', fontSize: 13, marginTop: 8, marginBottom: 24, textAlign: 'center' },
-  seekContainer: { width: SEEK_BAR_WIDTH, marginBottom: 32 },
-  seekBar: { height: 28, justifyContent: 'center', position: 'relative' },
-  seekTrack: {
-    position: 'absolute', left: 0, right: 0,
-    height: 3, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  seekFill: {
-    position: 'absolute', left: 0,
-    height: 3, borderRadius: 2,
-    backgroundColor: '#4dd9ac',
-  },
-  seekThumb: {
-    position: 'absolute',
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: '#4dd9ac',
-    marginLeft: -7, top: 7,
-    elevation: 4,
-  },
-  seekTimes: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
-  seekTime: { color: '#2a7a5e', fontSize: 11 },
+  playerDesc: { color: '#2a7a5e', fontSize: 13, marginTop: 8, marginBottom: 32, textAlign: 'center' },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 24 },
   prevBtn: { padding: 12 },
   nextBtn: { padding: 12 },

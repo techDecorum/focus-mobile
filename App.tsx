@@ -114,14 +114,17 @@ function AppInner() {
   );
 }
 
+import { ThemeProvider } from './contexts/ThemeContext';
+
 export default function App() {
   return (
-    <SolanaWalletProvider>
-      <AppInner />
-    </SolanaWalletProvider>
+    <ThemeProvider>
+      <SolanaWalletProvider>
+        <AppInner />
+      </SolanaWalletProvider>
+    </ThemeProvider>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#060d12' },
   content: { flex: 1 },

@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
 
 export type Screen = 'home' | 'feed' | 'library' | 'history' | 'settings';
 
@@ -9,29 +10,40 @@ interface Props {
 }
 
 const TABS = [
-  { id: 'home',     emoji: '⚡', label: 'Focus'   },
-  { id: 'feed',     emoji: '🌐', label: 'Feed'    },
-  { id: 'library',  emoji: '🎵', label: 'Music'   },
-  { id: 'history',  emoji: '📋', label: 'History' },
-  { id: 'settings', emoji: '⚙️', label: 'Settings'},
+  { id: 'feed',     emoji: '🌐', label: 'Feed'     },
+  { id: 'library',  emoji: '🎵', label: 'Music'    },
+  { id: 'home',     emoji: '⚡', label: 'Focus',   center: true },
+  { id: 'history',  emoji: '📋', label: 'History'  },
+  { id: 'settings', emoji: '⚙️', label: 'Settings' },
 ] as const;
 
 export default function BottomNav({ active, onNavigate }: Props) {
+  const { colors } = useTheme();
   return (
-    <View style={styles.container}>
-      {TABS.map(tab => (
-        <TouchableOpacity
-          key={tab.id}
-          style={styles.tab}
-          onPress={() => onNavigate(tab.id as Screen)}
-        >
-          <Text style={styles.emoji}>{tab.emoji}</Text>
-          <Text style={[styles.label, active === tab.id && styles.labelActive]}>
-            {tab.label}
-          </Text>
-          {active === tab.id && <View style={styles.dot} />}
-        </TouchableOpacity>
-      ))}
+    <View style={[styles.container, { backgroundColor: colors.navBg, borderTopColor: colors.navBorder }]}>
+      {TABS.map(tab => {
+        const isCenter = 'center' in tab && tab.center;
+        const isActive = active === tab.id;
+        return (
+          <TouchableOpacity
+            key={tab.id}
+            style={[styles.tab, isCenter && styles.centerTab]}
+            onPress={() => onNavigate(tab.id as Screen)}
+          >
+            {isCenter ? (
+              <View style={[styles.centerBtn, { borderColor: colors.accentDark, backgroundColor: `${colors.accent}22` }, isActive && { borderColor: colors.accent, backgroundColor: `${colors.accent}33` }]}>
+                <Text style={styles.centerEmoji}>{tab.emoji}</Text>
+              </View>
+            ) : (
+              <Text style={styles.emoji}>{tab.emoji}</Text>
+            )}
+            <Text style={[styles.label, { color: colors.textMuted }, isActive && { color: colors.accent }]}>
+              {tab.label}
+            </Text>
+            {isActive && !isCenter && <View style={[styles.dot, { backgroundColor: colors.accent }]} />}
+          </TouchableOpacity>
+        );
+      })}
     </View>
   );
 }
@@ -39,24 +51,21 @@ export default function BottomNav({ active, onNavigate }: Props) {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: '#060d12',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(77,217,172,0.1)',
     paddingBottom: 20,
     paddingTop: 10,
+    alignItems: 'flex-end',
   },
-  tab: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
+  tab: { flex: 1, alignItems: 'center', gap: 3 },
+  centerTab: { alignItems: 'center', marginTop: -20 },
+  centerBtn: {
+    width: 56, height: 56, borderRadius: 28,
+    borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 2,
   },
+  centerEmoji: { fontSize: 24 },
   emoji: { fontSize: 20 },
-  label: { color: '#4a7a6a', fontSize: 10, letterSpacing: 1 },
-  labelActive: { color: '#4dd9ac' },
-  dot: {
-    width: 4, height: 4,
-    borderRadius: 2,
-    backgroundColor: '#4dd9ac',
-    marginTop: 2,
-  },
+  label: { fontSize: 10, letterSpacing: 1 },
+  dot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
 });

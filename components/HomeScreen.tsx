@@ -1,44 +1,63 @@
 import { useConnection } from '@solana/wallet-adapter-react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
+import React, { useState, useRef } from 'react';
+import {
+  View, Text, TouchableOpacity, StyleSheet, TextInput,
+  Modal, Animated, Dimensions, ScrollView, KeyboardAvoidingView, Platform
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AuroraBackground from './AuroraBackground';
+import { useTheme } from '../contexts/ThemeContext';
+
+const { height } = Dimensions.get('window');
 
 interface Props {
   onStart: (duration: number, stakeAmount: number, publicKey: PublicKey, taskNote: string) => void;
 }
 
+const DURATIONS = [
+  { mins: 1,  label: '1',  sub: 'Quick Start' },
+  { mins: 3,  label: '3',  sub: 'Quick Reset' },
+  { mins: 5,  label: '5',  sub: 'Micro Focus' },
+  { mins: 15, label: '15', sub: 'Power Block' },
+  { mins: 25, label: '25', sub: 'Pomodoro' },
+  { mins: 50, label: '50', sub: 'Deep Work' },
+];
+
 export default function HomeScreen({ onStart }: Props) {
   const { connection } = useConnection();
+  const { theme, colors } = useTheme();
+  const c = colors;
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [solBalance, setSolBalance] = useState<number | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [duration, setDuration] = useState(25);
   const [stakeAmount, setStakeAmount] = useState(0.01);
   const [taskNote, setTaskNote] = useState('');
+  const slideAnim = useRef(new Animated.Value(height)).current;
 
-  const DURATIONS = [
-    { mins: 1, label: '1', sub: 'Quick Start' },
-    { mins: 3, label: '3', sub: 'Quick Reset' },
-    { mins: 5, label: '5', sub: 'Micro Focus' },
-    { mins: 15, label: '15', sub: 'Power Block' },
-    { mins: 25, label: '25', sub: 'Pomodoro' },
-    { mins: 50, label: '50', sub: 'Deep Work' },
-  ];
+  const openSheet = () => {
+    setSheetOpen(true);
+    Animated.spring(slideAnim, {
+      toValue: 0, tension: 65, friction: 11, useNativeDriver: true,
+    }).start();
+  };
+
+  const closeSheet = () => {
+    Animated.timing(slideAnim, {
+      toValue: height, duration: 300, useNativeDriver: true,
+    }).start(() => setSheetOpen(false));
+  };
 
   const fetchBalance = async (address: string) => {
     try {
       let pubkey: PublicKey;
-      try {
-        pubkey = new PublicKey(Buffer.from(address, 'base64'));
-      } catch {
-        pubkey = new PublicKey(address);
-      }
+      try { pubkey = new PublicKey(Buffer.from(address, 'base64')); }
+      catch { pubkey = new PublicKey(address); }
       const balance = await connection.getBalance(pubkey);
       setSolBalance(balance / LAMPORTS_PER_SOL);
-    } catch (err) {
-      console.log('Balance fetch failed:', err);
-    }
+    } catch {}
   };
 
   const handleConnect = async () => {
@@ -46,181 +65,258 @@ export default function HomeScreen({ onStart }: Props) {
       const authResult = await transact(async (wallet: Web3MobileWallet) => {
         return await wallet.authorize({
           cluster: 'devnet',
-          identity: {
-            name: 'Focus',
-            uri: 'https://focus-app-orpin.vercel.app',
-            icon: '/favicon.ico',
-          },
+          identity: { name: 'Focus', uri: 'https://focus-app-orpin.vercel.app', icon: '/favicon.ico' },
         });
       });
       setWalletAddress(authResult.accounts[0].address);
       fetchBalance(authResult.accounts[0].address);
-    } catch (err: any) {
-      console.log('Wallet connection cancelled:', err.message);
-    }
+    } catch {}
   };
 
-  const handleStart = () => {
+  const handleBegin = () => {
     if (!walletAddress) return alert('Connect your Phantom wallet first!');
-    if (!taskNote.trim()) return alert('What are you focusing on? Add a task note!');
+    if (!taskNote.trim()) return alert('What are you focusing on?');
     try {
       const pubkey = new PublicKey(Buffer.from(walletAddress, 'base64'));
-      onStart(duration, stakeAmount, pubkey, taskNote.trim());
+      closeSheet();
+      setTimeout(() => onStart(duration, stakeAmount, pubkey, taskNote.trim()), 350);
     } catch {
       const pubkey = new PublicKey(walletAddress);
-      onStart(duration, stakeAmount, pubkey, taskNote.trim());
+      closeSheet();
+      setTimeout(() => onStart(duration, stakeAmount, pubkey, taskNote.trim()), 350);
     }
   };
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.hero}>
-        <Text style={styles.label}>READY TO FOCUS</Text>
-        <Text style={styles.title}>Begin your session</Text>
-        <Text style={styles.subtitle}>Stake SOL. Focus. Earn it back.</Text>
-      </View>
+  // Light theme uses a soft gradient background instead of aurora
+  const lightBg = theme === 'light';
 
-      {!walletAddress ? (
-        <TouchableOpacity style={styles.walletButton} onPress={handleConnect}>
-          <Text style={styles.walletButtonText}>Connect Phantom Wallet</Text>
-        </TouchableOpacity>
+  return (
+    <View style={[styles.container, { backgroundColor: lightBg ? '#e8f5f0' : '#020814' }]}>
+
+      {/* Background */}
+      {lightBg ? (
+        <LinearGradient
+          colors={['#c8ede0', '#e8f5f0', '#f0faf6']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
       ) : (
-        <View style={styles.walletConnected}>
-          <Text style={styles.walletAddressText}>
-            {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
-          </Text>
-          {solBalance !== null && (
-            <Text style={styles.solBalance}>{solBalance.toFixed(4)} SOL</Text>
-          )}
-        </View>
+        <AuroraBackground />
       )}
 
-      {/* Task Note Input */}
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>WHAT ARE YOU FOCUSING ON?</Text>
-        <TextInput
-          style={styles.taskInput}
-          placeholder="e.g. Build the login page, Study chapter 3..."
-          placeholderTextColor="#1a4a35"
-          value={taskNote}
-          onChangeText={setTaskNote}
-          maxLength={100}
-          returnKeyType="done"
-        />
-        {taskNote.length > 0 && (
-          <Text style={styles.charCount}>{taskNote.length}/100</Text>
+      {/* Wallet - top right */}
+      <View style={styles.topBar}>
+        {!walletAddress ? (
+          <TouchableOpacity
+            style={[styles.walletBtn, {
+              borderColor: `${c.accent}55`,
+              backgroundColor: lightBg ? 'rgba(255,255,255,0.8)' : 'rgba(6,13,18,0.7)',
+            }]}
+            onPress={handleConnect}
+          >
+            <Text style={[styles.walletBtnText, { color: c.accent }]}>Connect Wallet</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={[styles.walletConnected, {
+            backgroundColor: lightBg ? 'rgba(255,255,255,0.8)' : 'rgba(6,13,18,0.7)',
+            borderColor: `${c.accent}33`,
+          }]}>
+            <View style={[styles.walletDot, { backgroundColor: c.accent }]} />
+            <Text style={[styles.walletText, { color: c.accent }]}>
+              {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
+            </Text>
+            {solBalance !== null && (
+              <Text style={[styles.walletBalance, { color: c.accent }]}>{solBalance.toFixed(3)} SOL</Text>
+            )}
+          </View>
         )}
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>SESSION DURATION</Text>
-        <View style={styles.durationGrid}>
-          {DURATIONS.map(d => (
-            <TouchableOpacity
-              key={d.mins}
-              onPress={() => setDuration(d.mins)}
-              style={[styles.durationButton, duration === d.mins && styles.durationButtonActive]}
-            >
-              <Text style={[styles.durationLabel, duration === d.mins && styles.durationLabelActive]}>
-                {d.label}
-              </Text>
-              <Text style={styles.durationSub}>{d.sub}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      {/* Center Content */}
+      <View style={styles.center}>
+        <Text style={[styles.appName, { color: lightBg ? '#0a2018' : '#f0faf6' }]}>FOCUS</Text>
+        <Text style={[styles.tagline, { color: lightBg ? c.accentDark : 'rgba(77,217,172,0.7)' }]}>
+          Stake your attention.
+        </Text>
+        <Text style={[styles.tagline2, { color: lightBg ? `${c.accentDark}99` : 'rgba(77,217,172,0.5)' }]}>
+          Earn it back.
+        </Text>
       </View>
 
-      <View style={styles.card}>
-        <View style={styles.cardRow}>
-          <Text style={styles.cardLabel}>STAKE AMOUNT</Text>
-          <Text style={styles.stakeValue}>{stakeAmount} SOL</Text>
-        </View>
-        <View style={styles.stakeButtons}>
-          {[0.01, 0.05, 0.1, 0.25, 0.5].map(amount => (
-            <TouchableOpacity
-              key={amount}
-              onPress={() => setStakeAmount(amount)}
-              style={[styles.stakeButton, stakeAmount === amount && styles.stakeButtonActive]}
-            >
-              <Text style={[styles.stakeButtonText, stakeAmount === amount && styles.stakeButtonTextActive]}>
-                {amount}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <LinearGradient
-        colors={['#2a7a5e', '#4dd9ac']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.startButton}
-      >
-        <TouchableOpacity onPress={handleStart} style={styles.startButtonInner}>
-          <Text style={styles.startButtonText}>Begin Focus Session</Text>
+      {/* Start Button */}
+      <View style={styles.bottomArea}>
+        <TouchableOpacity onPress={openSheet} activeOpacity={0.85}>
+          <LinearGradient
+            colors={['#2a7a5e', '#4dd9ac']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.startBtn}
+          >
+            <Text style={styles.startIcon}>◈</Text>
+            <Text style={styles.startText}>Start Focus</Text>
+          </LinearGradient>
         </TouchableOpacity>
-      </LinearGradient>
+        <Text style={[styles.hint, { color: lightBg ? `${c.accentDark}99` : 'rgba(42,122,94,0.6)' }]}>
+          Complete → full refund · Abandon → lose 20%
+        </Text>
+      </View>
 
-      <Text style={styles.disclaimer}>
-        1 min minimum · Complete → full refund · Abandon → lose 20%
-      </Text>
-    </ScrollView>
+      {/* Bottom Sheet */}
+      <Modal visible={sheetOpen} transparent animationType="none">
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={closeSheet} />
+        <Animated.View style={[
+          styles.sheet,
+          { backgroundColor: c.sheetBg, borderColor: `${c.accent}22` },
+          { transform: [{ translateY: slideAnim }] },
+        ]}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+            <View style={[styles.handle, { backgroundColor: `${c.accent}33` }]} />
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={[styles.sheetTitle, { color: c.text }]}>New Session</Text>
+
+              {/* Task Note */}
+              <Text style={[styles.sheetLabel, { color: c.textSub }]}>WHAT ARE YOU FOCUSING ON?</Text>
+              <TextInput
+                style={[styles.taskInput, {
+                  borderColor: c.inputBorder,
+                  backgroundColor: c.inputBg,
+                  color: c.text,
+                }]}
+                placeholder="e.g. Build the login page..."
+                placeholderTextColor={c.textMuted}
+                value={taskNote}
+                onChangeText={setTaskNote}
+                maxLength={100}
+                returnKeyType="done"
+              />
+
+              {/* Duration */}
+              <Text style={[styles.sheetLabel, { color: c.textSub }]}>DURATION</Text>
+              <View style={styles.durationGrid}>
+                {DURATIONS.map(d => (
+                  <TouchableOpacity
+                    key={d.mins}
+                    onPress={() => setDuration(d.mins)}
+                    style={[
+                      styles.durationBtn,
+                      { borderColor: c.cardBorder, backgroundColor: c.card },
+                      duration === d.mins && { borderColor: c.accent, backgroundColor: `${c.accent}15` },
+                    ]}
+                  >
+                    <Text style={[
+                      styles.durationNum,
+                      { color: c.textSub },
+                      duration === d.mins && { color: c.accent },
+                    ]}>
+                      {d.label}
+                    </Text>
+                    <Text style={[styles.durationSub, { color: c.textMuted }]}>{d.sub}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Stake */}
+              <Text style={[styles.sheetLabel, { color: c.textSub }]}>STAKE AMOUNT</Text>
+              <View style={styles.stakeRow}>
+                {[0.01, 0.05, 0.1, 0.25, 0.5].map(amount => (
+                  <TouchableOpacity
+                    key={amount}
+                    onPress={() => setStakeAmount(amount)}
+                    style={[
+                      styles.stakeBtn,
+                      { borderColor: c.cardBorder },
+                      stakeAmount === amount && { borderColor: c.accent, backgroundColor: `${c.accent}15` },
+                    ]}
+                  >
+                    <Text style={[
+                      styles.stakeBtnText,
+                      { color: c.textSub },
+                      stakeAmount === amount && { color: c.accent },
+                    ]}>
+                      {amount}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Begin */}
+              <LinearGradient
+                colors={['#2a7a5e', '#4dd9ac']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.beginBtn}
+              >
+                <TouchableOpacity onPress={handleBegin} style={styles.beginBtnInner}>
+                  <Text style={styles.beginBtnText}>
+                    Begin Session · {duration} min · {stakeAmount} SOL
+                  </Text>
+                </TouchableOpacity>
+              </LinearGradient>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </Animated.View>
+      </Modal>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#060d12' },
-  content: { padding: 24, paddingTop: 60 },
-  hero: { marginBottom: 32 },
-  label: { color: '#2a7a5e', fontSize: 11, letterSpacing: 3, marginBottom: 8 },
-  title: { color: '#f0faf6', fontSize: 36, fontWeight: 'bold', marginBottom: 8 },
-  subtitle: { color: '#2a7a5e', fontSize: 14 },
-  walletButton: {
-    borderWidth: 1, borderColor: '#2a7a5e', borderRadius: 12,
-    padding: 16, alignItems: 'center', marginBottom: 24,
+  container: { flex: 1 },
+  topBar: { position: 'absolute', top: 52, right: 20, zIndex: 10 },
+  walletBtn: {
+    borderWidth: 1, borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 8,
   },
-  walletButtonText: { color: '#4dd9ac', fontSize: 14, fontWeight: '600' },
+  walletBtnText: { fontSize: 12, fontWeight: '600' },
   walletConnected: {
-    borderWidth: 1, borderColor: '#2a7a5e', borderRadius: 12,
-    padding: 12, alignItems: 'center', marginBottom: 24,
-    backgroundColor: 'rgba(77,217,172,0.05)',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 8,
   },
-  walletAddressText: { color: '#4dd9ac', fontSize: 12 },
-  solBalance: { color: '#4dd9ac', fontSize: 16, fontWeight: '600', marginTop: 4 },
-  card: {
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 16, padding: 20, marginBottom: 16,
-    backgroundColor: 'rgba(255,255,255,0.02)',
+  walletDot: { width: 6, height: 6, borderRadius: 3 },
+  walletText: { fontSize: 11 },
+  walletBalance: { fontSize: 11, fontWeight: '700' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -60 },
+  appName: { fontSize: 52, fontWeight: '900', letterSpacing: 16, opacity: 0.95 },
+  tagline: { fontSize: 16, marginTop: 12, letterSpacing: 2 },
+  tagline2: { fontSize: 14, marginTop: 4, letterSpacing: 2 },
+  bottomArea: { position: 'absolute', bottom: 48, left: 24, right: 24, alignItems: 'center' },
+  startBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 48, paddingVertical: 20, borderRadius: 50,
   },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardLabel: { color: '#2a7a5e', fontSize: 11, letterSpacing: 2, marginBottom: 16 },
+  startIcon: { color: '#060d12', fontSize: 20 },
+  startText: { color: '#060d12', fontSize: 18, fontWeight: '800', letterSpacing: 1 },
+  hint: { fontSize: 11, marginTop: 14, textAlign: 'center' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+  sheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    padding: 24, paddingBottom: 40,
+    borderTopWidth: 1, maxHeight: height * 0.85,
+  },
+  handle: {
+    width: 40, height: 4, borderRadius: 2,
+    alignSelf: 'center', marginBottom: 20,
+  },
+  sheetTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 24 },
+  sheetLabel: { fontSize: 10, letterSpacing: 2, marginBottom: 12 },
   taskInput: {
-    borderWidth: 1, borderColor: 'rgba(77,217,172,0.2)',
-    borderRadius: 10, padding: 14,
-    color: '#f0faf6', fontSize: 14,
-    backgroundColor: 'rgba(77,217,172,0.03)',
+    borderWidth: 1, borderRadius: 12, padding: 14,
+    fontSize: 14, marginBottom: 24,
   },
-  charCount: { color: '#1a4a35', fontSize: 10, textAlign: 'right', marginTop: 6 },
-  durationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  durationButton: {
-    width: '30%', padding: 16, borderRadius: 12, alignItems: 'center',
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
+  durationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
+  durationBtn: {
+    width: '30%', padding: 14, borderRadius: 12,
+    alignItems: 'center', borderWidth: 1,
   },
-  durationButtonActive: { borderColor: '#4dd9ac', backgroundColor: 'rgba(77,217,172,0.1)' },
-  durationLabel: { color: '#2a7a5e', fontSize: 24, fontWeight: '300' },
-  durationLabelActive: { color: '#4dd9ac' },
-  durationSub: { color: '#2a7a5e', fontSize: 10, marginTop: 2 },
-  stakeValue: { color: '#4dd9ac', fontSize: 16, fontWeight: '600' },
-  stakeButtons: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  stakeButton: {
-    paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
-  },
-  stakeButtonActive: { borderColor: '#4dd9ac', backgroundColor: 'rgba(77,217,172,0.1)' },
-  stakeButtonText: { color: '#2a7a5e', fontSize: 14 },
-  stakeButtonTextActive: { color: '#4dd9ac' },
-  startButton: { borderRadius: 16, marginTop: 8 },
-  startButtonInner: { padding: 20, alignItems: 'center' },
-  startButtonText: { color: '#060d12', fontSize: 16, fontWeight: '700', letterSpacing: 1 },
-  disclaimer: { color: '#1a4a35', fontSize: 11, textAlign: 'center', marginTop: 16 },
+  durationNum: { fontSize: 22, fontWeight: '300' },
+  durationSub: { fontSize: 10, marginTop: 2 },
+  stakeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 28 },
+  stakeBtn: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1 },
+  stakeBtnText: { fontSize: 14 },
+  beginBtn: { borderRadius: 16 },
+  beginBtnInner: { padding: 18, alignItems: 'center' },
+  beginBtnText: { color: '#060d12', fontSize: 15, fontWeight: '700' },
 });
