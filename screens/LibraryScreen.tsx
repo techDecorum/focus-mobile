@@ -1,9 +1,9 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal } from 'react-native';
-import { Audio } from 'expo-av';
-import TrackVisualizer, { getVibeFromDescription, VibeType } from '../components/TrackVisualizer';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Modal, PanResponder } from 'react-native';
+import { Audio, AVPlaybackStatus } from 'expo-av';
+import TrackVisualizer, { getVibeFromDescription } from '../components/TrackVisualizer';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
 const BINAURAL_TRACKS = [
   { index: 0,  name: 'Deep Focus',    emoji: '🧠', description: 'Beta · 14Hz · Concentration',    file: require('../assets/audio/deep_focus.mp3') },
@@ -31,12 +31,41 @@ const PIANO_TRACKS = [
 ];
 
 const ALL_TRACKS = [...BINAURAL_TRACKS, ...PIANO_TRACKS];
+type Track = typeof ALL_TRACKS[0];
+
+const SEEK_BAR_WIDTH = width - 48;
+
+const formatTime = (ms: number) => {
+  const totalSecs = Math.floor(ms / 1000);
+  const mins = Math.floor(totalSecs / 60);
+  const secs = totalSecs % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
 
 export default function LibraryScreen() {
-  const [playingIndex, setPlayingIndex] = useState<number | null>(null);
+  const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [playerOpen, setPlayerOpen] = useState(false);
-  const [currentTrack, setCurrentTrack] = useState<typeof ALL_TRACKS[0] | null>(null);
+  const [positionMs, setPositionMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
+  const [seekPosition, setSeekPosition] = useState(0);
   const soundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (soundRef.current && isPlaying && !isSeeking) {
+        try {
+          const status = await soundRef.current.getStatusAsync() as AVPlaybackStatus;
+          if (status.isLoaded) {
+            setPositionMs(status.positionMillis);
+            setDurationMs(status.durationMillis ?? 0);
+          }
+        } catch {}
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [isPlaying, isSeeking]);
 
   const stopAudio = async () => {
     try {
@@ -46,15 +75,13 @@ export default function LibraryScreen() {
         soundRef.current = null;
       }
     } catch {}
+    setIsPlaying(false);
+    setPositionMs(0);
+    setDurationMs(0);
   };
 
-  const handlePlay = async (track: typeof ALL_TRACKS[0]) => {
+  const loadAndPlay = async (track: Track) => {
     await stopAudio();
-    if (playingIndex === track.index) {
-      setPlayingIndex(null);
-      setCurrentTrack(null);
-      return;
-    }
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
@@ -67,45 +94,103 @@ export default function LibraryScreen() {
         { shouldPlay: true, isLooping: true, volume: 1.0 }
       );
       soundRef.current = sound;
-      setPlayingIndex(track.index);
       setCurrentTrack(track);
+      setIsPlaying(true);
+      setPositionMs(0);
+      const status = await sound.getStatusAsync() as AVPlaybackStatus;
+      if (status.isLoaded && status.durationMillis) {
+        setDurationMs(status.durationMillis);
+      }
     } catch (err) {
       console.log('Playback error:', err);
     }
   };
 
-  const handleOpenPlayer = (track: typeof ALL_TRACKS[0]) => {
-    setCurrentTrack(track);
-    setPlayerOpen(true);
-    if (playingIndex !== track.index) {
-      handlePlay(track);
-    }
+  const handlePauseResume = async () => {
+    if (!soundRef.current) return;
+    try {
+      if (isPlaying) {
+        await soundRef.current.pauseAsync();
+        setIsPlaying(false);
+      } else {
+        await soundRef.current.playAsync();
+        setIsPlaying(true);
+      }
+    } catch {}
   };
 
-  const handleClosePlayer = () => {
+  const handleSeek = async (ratio: number) => {
+    if (!soundRef.current || !durationMs) return;
+    try {
+      await soundRef.current.setPositionAsync(Math.floor(ratio * durationMs));
+      setPositionMs(Math.floor(ratio * durationMs));
+    } catch {}
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        setIsSeeking(true);
+        setSeekPosition(Math.max(0, Math.min(1, evt.nativeEvent.locationX / SEEK_BAR_WIDTH)));
+      },
+      onPanResponderMove: (evt) => {
+        setSeekPosition(Math.max(0, Math.min(1, evt.nativeEvent.locationX / SEEK_BAR_WIDTH)));
+      },
+      onPanResponderRelease: (evt) => {
+        const ratio = Math.max(0, Math.min(1, evt.nativeEvent.locationX / SEEK_BAR_WIDTH));
+        setSeekPosition(ratio);
+        setIsSeeking(false);
+        handleSeek(ratio);
+      },
+    })
+  ).current;
+
+  const progress = isSeeking ? seekPosition : durationMs > 0 ? positionMs / durationMs : 0;
+
+  const handleTrackTap = (track: Track) => {
+    setPlayerOpen(true);
+    if (currentTrack?.index !== track.index) loadAndPlay(track);
+  };
+
+  const handlePrev = () => {
+    if (!currentTrack) return;
+    const idx = ALL_TRACKS.findIndex(t => t.index === currentTrack.index);
+    loadAndPlay(ALL_TRACKS[(idx - 1 + ALL_TRACKS.length) % ALL_TRACKS.length]);
+  };
+
+  const handleNext = () => {
+    if (!currentTrack) return;
+    const idx = ALL_TRACKS.findIndex(t => t.index === currentTrack.index);
+    loadAndPlay(ALL_TRACKS[(idx + 1) % ALL_TRACKS.length]);
+  };
+
+  const handleClosePlayer = async () => {
+    await stopAudio();
+    setCurrentTrack(null);
     setPlayerOpen(false);
   };
 
-  const renderTrack = (track: typeof ALL_TRACKS[0]) => (
-    <TouchableOpacity
-      key={track.index}
-      style={[styles.trackCard, playingIndex === track.index && styles.trackCardActive]}
-      onPress={() => handleOpenPlayer(track)}
-    >
-      <Text style={styles.trackEmoji}>{track.emoji}</Text>
-      <View style={styles.trackInfo}>
-        <Text style={[styles.trackName, playingIndex === track.index && styles.trackNameActive]}>
-          {track.name}
-        </Text>
-        <Text style={styles.trackDesc}>{track.description}</Text>
-      </View>
-      <View style={[styles.playBtn, playingIndex === track.index && styles.playBtnActive]}>
-        <Text style={styles.playBtnText}>
-          {playingIndex === track.index ? '❚❚' : '▶'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderTrack = (track: Track) => {
+    const isActive = currentTrack?.index === track.index;
+    return (
+      <TouchableOpacity
+        key={track.index}
+        style={[styles.trackCard, isActive && styles.trackCardActive]}
+        onPress={() => handleTrackTap(track)}
+      >
+        <Text style={styles.trackEmoji}>{track.emoji}</Text>
+        <View style={styles.trackInfo}>
+          <Text style={[styles.trackName, isActive && styles.trackNameActive]}>{track.name}</Text>
+          <Text style={styles.trackDesc}>{track.description}</Text>
+        </View>
+        <View style={[styles.playBtn, isActive && styles.playBtnActive]}>
+          <Text style={styles.playBtnText}>{isActive && isPlaying ? '❚❚' : '▶'}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <>
@@ -114,15 +199,14 @@ export default function LibraryScreen() {
         <Text style={styles.pageTitle}>Focus Sounds</Text>
         <Text style={styles.pageSub}>{ALL_TRACKS.length} tracks · Tap to open visual player</Text>
 
-        {/* Now Playing Bar */}
-        {playingIndex !== null && currentTrack && !playerOpen && (
+        {currentTrack && !playerOpen && (
           <TouchableOpacity style={styles.nowPlaying} onPress={() => setPlayerOpen(true)}>
             <Text style={styles.nowPlayingEmoji}>{currentTrack.emoji}</Text>
             <View style={styles.nowPlayingInfo}>
               <Text style={styles.nowPlayingLabel}>NOW PLAYING · TAP TO OPEN</Text>
               <Text style={styles.nowPlayingName}>{currentTrack.name}</Text>
             </View>
-            <TouchableOpacity onPress={async () => { await stopAudio(); setPlayingIndex(null); setCurrentTrack(null); }} style={styles.stopButton}>
+            <TouchableOpacity onPress={handleClosePlayer} style={styles.stopButton}>
               <Text style={styles.stopButtonText}>■</Text>
             </TouchableOpacity>
           </TouchableOpacity>
@@ -130,67 +214,46 @@ export default function LibraryScreen() {
 
         <Text style={styles.sectionLabel}>BINAURAL BEATS</Text>
         {BINAURAL_TRACKS.map(renderTrack)}
-
         <Text style={[styles.sectionLabel, { marginTop: 24 }]}>PIANO & AMBIENT</Text>
         {PIANO_TRACKS.map(renderTrack)}
-
         <Text style={styles.footer}>🎧 Use headphones for best binaural beat experience</Text>
       </ScrollView>
 
-      {/* Full Screen Visual Player */}
       <Modal visible={playerOpen} animationType="slide" statusBarTranslucent>
         <View style={styles.player}>
           {currentTrack && (
             <TrackVisualizer vibe={getVibeFromDescription(currentTrack.description)} />
           )}
-
-          {/* Player Overlay UI */}
           <View style={styles.playerOverlay}>
-            {/* Close */}
             <TouchableOpacity style={styles.closeBtn} onPress={handleClosePlayer}>
               <Text style={styles.closeBtnText}>↓</Text>
             </TouchableOpacity>
-
-            {/* Track Info */}
             <View style={styles.playerInfo}>
               <Text style={styles.playerEmoji}>{currentTrack?.emoji}</Text>
               <Text style={styles.playerName}>{currentTrack?.name}</Text>
               <Text style={styles.playerDesc}>{currentTrack?.description}</Text>
 
-              {/* Controls */}
+              {/* Seek Bar */}
+              <View style={styles.seekContainer}>
+                <View style={styles.seekBar} {...panResponder.panHandlers}>
+                  <View style={styles.seekTrack} />
+                  <View style={[styles.seekFill, { width: `${progress * 100}%` }]} />
+                  <View style={[styles.seekThumb, { left: `${progress * 100}%` }]} />
+                </View>
+                <View style={styles.seekTimes}>
+                  <Text style={styles.seekTime}>{formatTime(isSeeking ? seekPosition * durationMs : positionMs)}</Text>
+                  <Text style={styles.seekTime}>{durationMs ? formatTime(durationMs) : '--:--'}</Text>
+                </View>
+              </View>
+
               <View style={styles.controls}>
-                <TouchableOpacity
-                  style={styles.prevBtn}
-                  onPress={() => {
-                    const idx = ALL_TRACKS.findIndex(t => t.index === currentTrack?.index);
-                    const prev = ALL_TRACKS[(idx - 1 + ALL_TRACKS.length) % ALL_TRACKS.length];
-                    setCurrentTrack(prev);
-                    handlePlay(prev);
-                  }}
-                >
+                <TouchableOpacity style={styles.prevBtn} onPress={handlePrev}>
                   <Text style={styles.controlText}>⏮</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.playPauseBtn}
-                  onPress={() => {
-                    if (currentTrack) handlePlay(currentTrack);
-                  }}
-                >
-                  <Text style={styles.playPauseText}>
-                    {playingIndex === currentTrack?.index ? '❚❚' : '▶'}
-                  </Text>
+                <TouchableOpacity style={styles.playPauseBtn} onPress={handlePauseResume}>
+                  <Text style={styles.playPauseText}>{isPlaying ? '❚❚' : '▶'}</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.nextBtn}
-                  onPress={() => {
-                    const idx = ALL_TRACKS.findIndex(t => t.index === currentTrack?.index);
-                    const next = ALL_TRACKS[(idx + 1) % ALL_TRACKS.length];
-                    setCurrentTrack(next);
-                    handlePlay(next);
-                  }}
-                >
+                <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
                   <Text style={styles.controlText}>⏭</Text>
                 </TouchableOpacity>
               </View>
@@ -245,8 +308,7 @@ const styles = StyleSheet.create({
   playerOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'space-between',
-    padding: 24,
-    paddingTop: 50,
+    padding: 24, paddingTop: 50,
   },
   closeBtn: {
     width: 44, height: 44, borderRadius: 22,
@@ -258,7 +320,28 @@ const styles = StyleSheet.create({
   playerInfo: { alignItems: 'center', paddingBottom: 40 },
   playerEmoji: { fontSize: 56, marginBottom: 16 },
   playerName: { color: '#f0faf6', fontSize: 26, fontWeight: 'bold', textAlign: 'center' },
-  playerDesc: { color: '#2a7a5e', fontSize: 13, marginTop: 8, marginBottom: 32, textAlign: 'center' },
+  playerDesc: { color: '#2a7a5e', fontSize: 13, marginTop: 8, marginBottom: 24, textAlign: 'center' },
+  seekContainer: { width: SEEK_BAR_WIDTH, marginBottom: 32 },
+  seekBar: { height: 28, justifyContent: 'center', position: 'relative' },
+  seekTrack: {
+    position: 'absolute', left: 0, right: 0,
+    height: 3, borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  seekFill: {
+    position: 'absolute', left: 0,
+    height: 3, borderRadius: 2,
+    backgroundColor: '#4dd9ac',
+  },
+  seekThumb: {
+    position: 'absolute',
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: '#4dd9ac',
+    marginLeft: -7, top: 7,
+    elevation: 4,
+  },
+  seekTimes: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  seekTime: { color: '#2a7a5e', fontSize: 11 },
   controls: { flexDirection: 'row', alignItems: 'center', gap: 24 },
   prevBtn: { padding: 12 },
   nextBtn: { padding: 12 },
