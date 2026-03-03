@@ -2,11 +2,11 @@ import { useConnection } from '@solana/wallet-adapter-react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 interface Props {
-  onStart: (duration: number, stakeAmount: number, publicKey: PublicKey) => void;
+  onStart: (duration: number, stakeAmount: number, publicKey: PublicKey, taskNote: string) => void;
 }
 
 export default function HomeScreen({ onStart }: Props) {
@@ -15,6 +15,7 @@ export default function HomeScreen({ onStart }: Props) {
   const [solBalance, setSolBalance] = useState<number | null>(null);
   const [duration, setDuration] = useState(25);
   const [stakeAmount, setStakeAmount] = useState(0.01);
+  const [taskNote, setTaskNote] = useState('');
 
   const DURATIONS = [
     { mins: 1, label: '1', sub: 'Quick Start' },
@@ -61,12 +62,13 @@ export default function HomeScreen({ onStart }: Props) {
 
   const handleStart = () => {
     if (!walletAddress) return alert('Connect your Phantom wallet first!');
+    if (!taskNote.trim()) return alert('What are you focusing on? Add a task note!');
     try {
       const pubkey = new PublicKey(Buffer.from(walletAddress, 'base64'));
-      onStart(duration, stakeAmount, pubkey);
+      onStart(duration, stakeAmount, pubkey, taskNote.trim());
     } catch {
       const pubkey = new PublicKey(walletAddress);
-      onStart(duration, stakeAmount, pubkey);
+      onStart(duration, stakeAmount, pubkey, taskNote.trim());
     }
   };
 
@@ -92,6 +94,23 @@ export default function HomeScreen({ onStart }: Props) {
           )}
         </View>
       )}
+
+      {/* Task Note Input */}
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>WHAT ARE YOU FOCUSING ON?</Text>
+        <TextInput
+          style={styles.taskInput}
+          placeholder="e.g. Build the login page, Study chapter 3..."
+          placeholderTextColor="#1a4a35"
+          value={taskNote}
+          onChangeText={setTaskNote}
+          maxLength={100}
+          returnKeyType="done"
+        />
+        {taskNote.length > 0 && (
+          <Text style={styles.charCount}>{taskNote.length}/100</Text>
+        )}
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.cardLabel}>SESSION DURATION</Text>
@@ -175,6 +194,13 @@ const styles = StyleSheet.create({
   },
   cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   cardLabel: { color: '#2a7a5e', fontSize: 11, letterSpacing: 2, marginBottom: 16 },
+  taskInput: {
+    borderWidth: 1, borderColor: 'rgba(77,217,172,0.2)',
+    borderRadius: 10, padding: 14,
+    color: '#f0faf6', fontSize: 14,
+    backgroundColor: 'rgba(77,217,172,0.03)',
+  },
+  charCount: { color: '#1a4a35', fontSize: 10, textAlign: 'right', marginTop: 6 },
   durationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   durationButton: {
     width: '30%', padding: 16, borderRadius: 12, alignItems: 'center',
