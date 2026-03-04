@@ -88,16 +88,32 @@ export default function ActiveScreen({
   };
 
   const handleComplete = async () => {
-    setLoading(true);
-    try {
-      const sig = await completeSession(connection, publicKey);
-      const vaultState = await fetchVaultState(connection, publicKey);
-      const reward = vaultState ? ((vaultState as any).totalEarnedFromPool?.toNumber() ?? 0) / 1e9 : 0;
-      onComplete(sig, reward);
-    } catch (err: any) {
-      Alert.alert('Error', `Failed to complete: ${err.message}`);
-    } finally { setLoading(false); }
-  };
+  setLoading(true);
+  try {
+    const vaultBefore = await fetchVaultState(connection, publicKey);
+    console.log('=== VAULT BEFORE ===', JSON.stringify(vaultBefore, null, 2));
+
+    const sig = await completeSession(connection, publicKey);
+    console.log('=== TX SIG ===', sig);
+
+    const vaultAfter = await fetchVaultState(connection, publicKey);
+    console.log('=== VAULT AFTER ===', JSON.stringify(vaultAfter, null, 2));
+
+    const rewardBefore = vaultBefore ? ((vaultBefore as any).totalEarnedFromPool?.toNumber() ?? 0) : 0;
+    const rewardAfter = vaultAfter ? ((vaultAfter as any).totalEarnedFromPool?.toNumber() ?? 0) : 0;
+
+    console.log('=== REWARD BEFORE (lamports):', rewardBefore);
+    console.log('=== REWARD AFTER (lamports):', rewardAfter);
+    console.log('=== DIFF (SOL):', (rewardAfter - rewardBefore) / 1e9);
+
+    const reward = Math.max(0, rewardAfter - rewardBefore) / 1e9;
+    onComplete(sig, reward);
+  } catch (err: any) {
+    Alert.alert('Error', `Failed to complete: ${err.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleAbandon = async () => {
     Alert.alert('Abandon Session?', `You will forfeit ${(stakeAmount * 0.2).toFixed(3)} SOL`, [

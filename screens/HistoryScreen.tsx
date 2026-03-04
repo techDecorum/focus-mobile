@@ -34,7 +34,7 @@ export default function HistoryScreen() {
   const filtered = filter === 'all' ? history : history.filter(h => h.status === filter);
   const totalCompleted = history.filter(h => h.status === 'completed').length;
   const totalMinutes = history.filter(h => h.status === 'completed').reduce((acc, h) => acc + h.duration, 0);
-  const totalReward = history.filter(h => h.status === 'completed').reduce((acc, h) => acc + h.reward, 0);
+  const totalStaked = history.filter(h => h.status === 'completed').reduce((acc, h) => acc + h.stakeAmount, 0);
 
   const formatDate = (iso: string) => {
     const d = new Date(iso);
@@ -57,8 +57,8 @@ export default function HistoryScreen() {
           <Text style={[styles.statLabel, { color: c.textSub }]}>Minutes</Text>
         </View>
         <View style={[styles.statCard, { backgroundColor: `${c.accent}0d`, borderColor: `${c.accent}22` }]}>
-          <Text style={[styles.statValue, { color: '#fbbf24' }]}>{totalReward.toFixed(3)}</Text>
-          <Text style={[styles.statLabel, { color: c.textSub }]}>SOL Earned</Text>
+          <Text style={[styles.statValue, { color: c.accent }]}>{totalStaked.toFixed(3)}</Text>
+          <Text style={[styles.statLabel, { color: c.textSub }]}>SOL Staked</Text>
         </View>
       </View>
 

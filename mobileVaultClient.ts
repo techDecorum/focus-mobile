@@ -1,47 +1,46 @@
 import { Program, AnchorProvider, BN, web3 } from '@coral-xyz/anchor';
 import {
-  Connection,
-  PublicKey,
-  LAMPORTS_PER_SOL,
-  Transaction,
+  Connection, PublicKey, LAMPORTS_PER_SOL, Transaction,
 } from '@solana/web3.js';
-import { Buffer } from 'buffer';
-import {
-  transact,
-  Web3MobileWallet,
-} from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
+import { Buffer } from '@craftzdog/react-native-buffer';
+import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import idl from './idl.json';
 
 const PROGRAM_ID = new PublicKey('2bsjJXARsoLH49Svs1pRw98rr1dctYHJHov43dLvqUjg');
+const DEVNET = new Connection('https://api.devnet.solana.com', 'confirmed');
 
 export const getPoolPDA = (): PublicKey => {
   const [poolPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from('global_pool')],
-    PROGRAM_ID
+    [Buffer.from('global_pool')], PROGRAM_ID
   );
   return poolPDA;
 };
 
 export const getVaultPDA = (userPublicKey: PublicKey): PublicKey => {
   const [vaultPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from('vault'), userPublicKey.toBytes()],
-    PROGRAM_ID
+    [Buffer.from('vault'), userPublicKey.toBytes()], PROGRAM_ID
   );
   return vaultPDA;
 };
 
-// Helper: sign and send a transaction using Mobile Wallet Adapter
+const getReadonlyProgram = (publicKey: PublicKey) => {
+  const dummyWallet = {
+    publicKey,
+    signTransaction: async (tx: Transaction) => tx,
+    signAllTransactions: async (txs: Transaction[]) => txs,
+  };
+  const provider = new AnchorProvider(DEVNET, dummyWallet as any, { commitment: 'confirmed' });
+  return new Program(idl as any, PROGRAM_ID, provider);
+};
+
 const signAndSendTransaction = async (
-  connection: Connection,
   publicKey: PublicKey,
   transaction: Transaction
 ): Promise<string> => {
-  // Get latest blockhash
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+  const { blockhash, lastValidBlockHeight } = await DEVNET.getLatestBlockhash();
   transaction.recentBlockhash = blockhash;
   transaction.feePayer = publicKey;
 
-  // Sign with Mobile Wallet Adapter
   const signedTxs = await transact(async (wallet: Web3MobileWallet) => {
     await wallet.authorize({
       cluster: 'devnet',
@@ -54,51 +53,26 @@ const signAndSendTransaction = async (
     return await wallet.signTransactions({ transactions: [transaction] });
   });
 
-  // Send signed transaction
-  const signature = await connection.sendRawTransaction(
-    signedTxs[0].serialize()
-  );
-  await connection.confirmTransaction({
-    signature,
-    blockhash,
-    lastValidBlockHeight,
-  });
+  const signature = await DEVNET.sendRawTransaction(signedTxs[0].serialize());
+  await DEVNET.confirmTransaction({ signature, blockhash, lastValidBlockHeight });
   return signature;
-};
-
-// Helper: get a read-only program for fetching accounts
-const getReadonlyProgram = (connection: Connection, publicKey: PublicKey) => {
-  const dummyWallet = {
-    publicKey,
-    signTransaction: async (tx: Transaction) => tx,
-    signAllTransactions: async (txs: Transaction[]) => txs,
-  };
-  const provider = new AnchorProvider(connection, dummyWallet as any, {
-    commitment: 'confirmed',
-  });
-  return new Program(idl as any, PROGRAM_ID, provider);
 };
 
 export const initializeVault = async (
   connection: Connection,
   publicKey: PublicKey
 ): Promise<string> => {
-  const program = getReadonlyProgram(connection, publicKey);
+  const program = getReadonlyProgram(publicKey);
   const vaultPDA = getVaultPDA(publicKey);
   const poolPDA = getPoolPDA();
-
   const ix = await program.methods
     .initializeVault()
     .accounts({
-      vault: vaultPDA,
-      pool: poolPDA,
-      user: publicKey,
-      systemProgram: web3.SystemProgram.programId,
+      vault: vaultPDA, pool: poolPDA,
+      user: publicKey, systemProgram: web3.SystemProgram.programId,
     })
     .instruction();
-
-  const tx = new Transaction().add(ix);
-  return signAndSendTransaction(connection, publicKey, tx);
+  return signAndSendTransaction(publicKey, new Transaction().add(ix));
 };
 
 export const startSession = async (
@@ -107,88 +81,100 @@ export const startSession = async (
   amountSOL: number,
   durationSeconds: number
 ): Promise<string> => {
-  const program = getReadonlyProgram(connection, publicKey);
+  const program = getReadonlyProgram(publicKey);
   const vaultPDA = getVaultPDA(publicKey);
-  const amountLamports = new BN(Math.floor(amountSOL * LAMPORTS_PER_SOL));
-  const duration = new BN(durationSeconds);
-
   const ix = await program.methods
-    .startSession(amountLamports, duration)
+    .startSession(new BN(Math.floor(amountSOL * LAMPORTS_PER_SOL)), new BN(durationSeconds))
     .accounts({
-      vault: vaultPDA,
-      user: publicKey,
+      vault: vaultPDA, user: publicKey,
       systemProgram: web3.SystemProgram.programId,
     })
     .instruction();
-
-  const tx = new Transaction().add(ix);
-  return signAndSendTransaction(connection, publicKey, tx);
+  return signAndSendTransaction(publicKey, new Transaction().add(ix));
 };
 
 export const completeSession = async (
   connection: Connection,
   publicKey: PublicKey
 ): Promise<string> => {
-  const program = getReadonlyProgram(connection, publicKey);
+  const program = getReadonlyProgram(publicKey);
   const vaultPDA = getVaultPDA(publicKey);
   const poolPDA = getPoolPDA();
-
   const ix = await program.methods
     .completeSession()
-    .accounts({
-      vault: vaultPDA,
-      pool: poolPDA,
-      user: publicKey,
-    })
+    .accounts({ vault: vaultPDA, pool: poolPDA, user: publicKey })
     .instruction();
-
-  const tx = new Transaction().add(ix);
-  return signAndSendTransaction(connection, publicKey, tx);
+  return signAndSendTransaction(publicKey, new Transaction().add(ix));
 };
 
 export const abandonSession = async (
   connection: Connection,
   publicKey: PublicKey
 ): Promise<string> => {
-  const program = getReadonlyProgram(connection, publicKey);
+  const program = getReadonlyProgram(publicKey);
   const vaultPDA = getVaultPDA(publicKey);
   const poolPDA = getPoolPDA();
-
   const ix = await program.methods
     .abandonSession()
-    .accounts({
-      vault: vaultPDA,
-      pool: poolPDA,
-      user: publicKey,
-    })
+    .accounts({ vault: vaultPDA, pool: poolPDA, user: publicKey })
     .instruction();
-
-  const tx = new Transaction().add(ix);
-  return signAndSendTransaction(connection, publicKey, tx);
+  return signAndSendTransaction(publicKey, new Transaction().add(ix));
 };
 
+// Raw deserialization - bypasses Anchor to avoid Buffer polyfill issues
 export const fetchVaultState = async (
   connection: Connection,
   publicKey: PublicKey
 ) => {
   try {
-    const program = getReadonlyProgram(connection, publicKey);
     const vaultPDA = getVaultPDA(publicKey);
-    return await program.account.vaultAccount.fetch(vaultPDA);
-  } catch {
+    const accountInfo = await DEVNET.getAccountInfo(vaultPDA);
+    if (!accountInfo) return null;
+
+    const data = accountInfo.data;
+    // Layout: 8 discriminator | 32 owner | 1 isActive | 8 startTime
+    //         8 durationSeconds | 8 stakedAmount | 8 totalSessions
+    //         8 successfulSessions | 8 totalEarnedFromPool
+    let offset = 8 + 32 + 1 + 8 + 8 + 8 + 8 + 8;
+    const totalEarnedFromPool = data.readBigUInt64LE(offset);
+
+    console.log('=== VAULT totalEarnedFromPool ===', Number(totalEarnedFromPool), 'lamports =', Number(totalEarnedFromPool) / 1e9, 'SOL');
+
+    return {
+      totalEarnedFromPool: { toNumber: () => Number(totalEarnedFromPool) },
+    };
+  } catch (err) {
+    console.log('=== VAULT FETCH ERROR ===', err);
     return null;
   }
 };
 
+// Raw deserialization - bypasses Anchor to avoid Buffer polyfill issues
 export const fetchPoolState = async (
   connection: Connection,
   publicKey: PublicKey
 ) => {
   try {
-    const program = getReadonlyProgram(connection, publicKey);
     const poolPDA = getPoolPDA();
-    return await program.account.poolAccount.fetch(poolPDA);
-  } catch {
+    const accountInfo = await DEVNET.getAccountInfo(poolPDA);
+    if (!accountInfo) return null;
+
+    const data = accountInfo.data;
+    // Layout: 8 discriminator | 8 totalBalance | 8 totalContributors | 1 bump
+    const totalBalance = data.readBigUInt64LE(8);
+    const totalContributors = data.readBigUInt64LE(16);
+
+    console.log('=== POOL STATE ===', {
+      totalBalanceSOL: Number(totalBalance) / 1e9,
+      totalContributors: Number(totalContributors),
+    });
+
+    return {
+      totalBalance: { toNumber: () => Number(totalBalance) },
+      totalContributors: { toNumber: () => Number(totalContributors) },
+    };
+  } catch (err) {
+    console.log('=== POOL FETCH ERROR ===', err);
     return null;
   }
 };

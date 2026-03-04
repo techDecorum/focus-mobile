@@ -1,7 +1,7 @@
 import './polyfills';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, StyleSheet, Modal } from 'react-native';
 import { SolanaWalletProvider } from './components/WalletProvider';
 import HomeScreen from './components/HomeScreen';
 import ActiveScreen from './components/ActiveScreen';
@@ -12,8 +12,11 @@ import FeedScreen from './screens/FeedScreen';
 import LibraryScreen from './screens/LibraryScreen';
 import HistoryScreen from './screens/HistoryScreen';
 import SettingsScreen from './screens/SettingsScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
 import { PublicKey } from '@solana/web3.js';
 import { useConnection } from '@solana/wallet-adapter-react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 type AppScreen = 'home' | 'active' | 'success' | 'abandoned';
 
@@ -27,6 +30,20 @@ function AppInner() {
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [poolReward, setPoolReward] = useState(0);
   const [taskNote, setTaskNote] = useState('');
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('onboarding_done').then(val => {
+      setOnboardingDone(val === 'true');
+    });
+  }, []);
+
+  const handleOnboardingDone = async () => {
+    await AsyncStorage.setItem('onboarding_done', 'true');
+    setOnboardingDone(true);
+    setOnboardingOpen(false);
+  };
 
   const showNav = appScreen !== 'active';
 
@@ -34,6 +51,17 @@ function AppInner() {
     setNavScreen(screen);
     setAppScreen('home');
   };
+
+  if (onboardingDone === null) return null;
+
+  if (!onboardingDone) {
+    return (
+      <View style={styles.container}>
+        <StatusBar style="light" />
+        <OnboardingScreen onDone={handleOnboardingDone} />
+      </View>
+    );
+  }
 
   const renderScreen = () => {
     if (appScreen === 'active' && publicKey) {
@@ -92,12 +120,13 @@ function AppInner() {
               setTaskNote(task);
               setAppScreen('active');
             }}
+            onShowInfo={() => setOnboardingOpen(true)}
           />
         );
       case 'feed':     return <FeedScreen />;
       case 'library':  return <LibraryScreen />;
       case 'history':  return <HistoryScreen />;
-      case 'settings': return <SettingsScreen />;
+      case 'settings': return <SettingsScreen onShowInfo={() => setOnboardingOpen(true)} />;
     }
   };
 
@@ -110,11 +139,12 @@ function AppInner() {
       {showNav && (
         <BottomNav active={navScreen} onNavigate={handleNavigate} />
       )}
+      <Modal visible={onboardingOpen} animationType="slide">
+        <OnboardingScreen onDone={handleOnboardingDone} />
+      </Modal>
     </View>
   );
 }
-
-import { ThemeProvider } from './contexts/ThemeContext';
 
 export default function App() {
   return (
@@ -125,6 +155,7 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#060d12' },
   content: { flex: 1 },

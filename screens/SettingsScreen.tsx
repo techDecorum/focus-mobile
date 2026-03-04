@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Switch, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
+
+const TWEET_TEXT = encodeURIComponent(
+  `🧠 Just discovered Focus — the app that makes you stake SOL to stay focused.\n\nComplete your session → full refund.\nAbandon early → lose 20%.\n\nBuilt on @Solana ⚡\n\nhttps://focus-app-orpin.vercel.app`
+);
 
 const TRACKS = [
   { index: 0,  name: 'Deep Focus',          emoji: '🧠', description: 'Beta · 14Hz' },
@@ -25,7 +29,11 @@ const TRACKS = [
   { index: 18, name: 'Midnight Sleep',       emoji: '🌃', description: 'Sleep' },
 ];
 
-export default function SettingsScreen() {
+interface Props {
+  onShowInfo: () => void;
+}
+
+export default function SettingsScreen({ onShowInfo }: Props) {
   const { theme, colors, toggleTheme } = useTheme();
   const [displayName, setDisplayName] = useState('');
   const [editingName, setEditingName] = useState(false);
@@ -129,7 +137,6 @@ export default function SettingsScreen() {
             <Text style={[styles.chevron, { color: c.textSub }]}>{trackExpanded ? '▲' : '▼'}</Text>
           </View>
         </TouchableOpacity>
-
         {trackExpanded && (
           <View style={[styles.trackList, { backgroundColor: c.card, borderColor: c.cardBorder }]}>
             {TRACKS.map(track => (
@@ -189,6 +196,37 @@ export default function SettingsScreen() {
             />
           </View>
         </View>
+      </View>
+
+      {/* Help */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionLabel, { color: c.textSub }]}>HELP</Text>
+
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: c.card, borderColor: c.cardBorder, marginBottom: 10 }]}
+          onPress={onShowInfo}
+        >
+          <View style={styles.switchRow}>
+            <View style={styles.switchInfo}>
+              <Text style={[styles.switchLabel, { color: c.text }]}>ℹ  How Focus Works</Text>
+              <Text style={[styles.switchDesc, { color: c.textSub }]}>Replay the onboarding guide</Text>
+            </View>
+            <Text style={[styles.chevron, { color: c.textSub }]}>›</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: c.card, borderColor: c.cardBorder }]}
+          onPress={() => Linking.openURL(`https://twitter.com/intent/tweet?text=${TWEET_TEXT}`)}
+        >
+          <View style={styles.switchRow}>
+            <View style={styles.switchInfo}>
+              <Text style={[styles.switchLabel, { color: c.text }]}>𝕏  Share on X</Text>
+              <Text style={[styles.switchDesc, { color: c.textSub }]}>Tell your friends about Focus</Text>
+            </View>
+            <Text style={[styles.chevron, { color: 'rgb(29,161,242)' }]}>›</Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Data */}

@@ -1,19 +1,27 @@
 import { useConnection } from '@solana/wallet-adapter-react';
 import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
 import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
-  Modal, Animated, Dimensions, ScrollView, KeyboardAvoidingView, Platform
+  Modal, Animated, Dimensions, ScrollView, KeyboardAvoidingView,
+  Platform, Linking
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AuroraBackground from './AuroraBackground';
 import { useTheme } from '../contexts/ThemeContext';
+import { fetchPoolState } from '../mobileVaultClient';
 
 const { height } = Dimensions.get('window');
+const PROGRAM_ID = new PublicKey('2bsjJXARsoLH49Svs1pRw98rr1dctYHJHov43dLvqUjg');
+
+const TWEET_TEXT = encodeURIComponent(
+  `🧠 Just discovered Focus — the app that makes you stake SOL to stay focused.\n\nComplete your session → full refund.\nAbandon early → lose 20%.\n\nBuilt on @Solana ⚡\n\nhttps://focus-app-orpin.vercel.app`
+);
 
 interface Props {
   onStart: (duration: number, stakeAmount: number, publicKey: PublicKey, taskNote: string) => void;
+  onShowInfo: () => void;
 }
 
 const DURATIONS = [
@@ -25,17 +33,31 @@ const DURATIONS = [
   { mins: 50, label: '50', sub: 'Deep Work' },
 ];
 
-export default function HomeScreen({ onStart }: Props) {
+export default function HomeScreen({ onStart, onShowInfo }: Props) {
   const { connection } = useConnection();
   const { theme, colors } = useTheme();
   const c = colors;
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [solBalance, setSolBalance] = useState<number | null>(null);
+  const [poolBalance, setPoolBalance] = useState<number>(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [duration, setDuration] = useState(25);
   const [stakeAmount, setStakeAmount] = useState(0.01);
   const [taskNote, setTaskNote] = useState('');
   const slideAnim = useRef(new Animated.Value(height)).current;
+
+  useEffect(() => {
+    fetchPoolState(connection, PROGRAM_ID)
+      .then((pool: any) => {
+        console.log('=== POOL STATE ===', JSON.stringify(pool, (key, value) =>
+          typeof value === 'object' && value?.toNumber ? value.toNumber() : value
+        , 2));
+        if (pool?.totalBalance) {
+          setPoolBalance(pool.totalBalance.toNumber() / 1e9);
+        }
+      })
+      .catch((err) => console.log('=== POOL ERROR ===', err));
+  }, []);
 
   const openSheet = () => {
     setSheetOpen(true);
@@ -87,7 +109,6 @@ export default function HomeScreen({ onStart }: Props) {
     }
   };
 
-  // Light theme uses a soft gradient background instead of aurora
   const lightBg = theme === 'light';
 
   return (
@@ -104,6 +125,29 @@ export default function HomeScreen({ onStart }: Props) {
       ) : (
         <AuroraBackground />
       )}
+
+      {/* Top left — ℹ and 𝕏 */}
+      <View style={styles.topLeft}>
+        <TouchableOpacity
+          style={[styles.topIconBtn, {
+            borderColor: `${c.accent}44`,
+            backgroundColor: lightBg ? 'rgba(255,255,255,0.8)' : 'rgba(6,13,18,0.7)',
+          }]}
+          onPress={onShowInfo}
+        >
+          <Text style={[styles.topIconText, { color: c.accent }]}>ℹ</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.topIconBtn, {
+            borderColor: 'rgba(29,161,242,0.35)',
+            backgroundColor: lightBg ? 'rgba(255,255,255,0.8)' : 'rgba(6,13,18,0.7)',
+          }]}
+          onPress={() => Linking.openURL(`https://twitter.com/intent/tweet?text=${TWEET_TEXT}`)}
+        >
+          <Text style={[styles.topIconText, { color: 'rgb(29,161,242)' }]}>𝕏</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Wallet - top right */}
       <View style={styles.topBar}>
@@ -144,8 +188,18 @@ export default function HomeScreen({ onStart }: Props) {
         </Text>
       </View>
 
-      {/* Start Button */}
+      {/* Bottom Area */}
       <View style={styles.bottomArea}>
+        {poolBalance > 0 && (
+          <View style={[styles.poolBadge, {
+            backgroundColor: lightBg ? 'rgba(255,255,255,0.6)' : 'rgba(6,13,18,0.6)',
+            borderColor: 'rgba(251,191,36,0.25)',
+          }]}>
+            <Text style={styles.poolDot}>●</Text>
+            <Text style={styles.poolText}>Penalty pool · {poolBalance.toFixed(4)} SOL</Text>
+          </View>
+        )}
+
         <TouchableOpacity onPress={openSheet} activeOpacity={0.85}>
           <LinearGradient
             colors={['#2a7a5e', '#4dd9ac']}
@@ -175,7 +229,6 @@ export default function HomeScreen({ onStart }: Props) {
             <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={[styles.sheetTitle, { color: c.text }]}>New Session</Text>
 
-              {/* Task Note */}
               <Text style={[styles.sheetLabel, { color: c.textSub }]}>WHAT ARE YOU FOCUSING ON?</Text>
               <TextInput
                 style={[styles.taskInput, {
@@ -191,7 +244,6 @@ export default function HomeScreen({ onStart }: Props) {
                 returnKeyType="done"
               />
 
-              {/* Duration */}
               <Text style={[styles.sheetLabel, { color: c.textSub }]}>DURATION</Text>
               <View style={styles.durationGrid}>
                 {DURATIONS.map(d => (
@@ -216,7 +268,6 @@ export default function HomeScreen({ onStart }: Props) {
                 ))}
               </View>
 
-              {/* Stake */}
               <Text style={[styles.sheetLabel, { color: c.textSub }]}>STAKE AMOUNT</Text>
               <View style={styles.stakeRow}>
                 {[0.01, 0.05, 0.1, 0.25, 0.5].map(amount => (
@@ -240,7 +291,6 @@ export default function HomeScreen({ onStart }: Props) {
                 ))}
               </View>
 
-              {/* Begin */}
               <LinearGradient
                 colors={['#2a7a5e', '#4dd9ac']}
                 start={{ x: 0, y: 0 }}
@@ -263,16 +313,21 @@ export default function HomeScreen({ onStart }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  topBar: { position: 'absolute', top: 52, right: 20, zIndex: 10 },
-  walletBtn: {
-    borderWidth: 1, borderRadius: 20,
-    paddingHorizontal: 16, paddingVertical: 8,
+  topLeft: {
+    position: 'absolute', top: 52, left: 20, zIndex: 10,
+    flexDirection: 'row', gap: 8,
   },
+  topIconBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    borderWidth: 1, alignItems: 'center', justifyContent: 'center',
+  },
+  topIconText: { fontSize: 15, fontWeight: '700' },
+  topBar: { position: 'absolute', top: 52, right: 20, zIndex: 10 },
+  walletBtn: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 16, paddingVertical: 8 },
   walletBtnText: { fontSize: 12, fontWeight: '600' },
   walletConnected: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    borderWidth: 1, borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 8,
+    borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8,
   },
   walletDot: { width: 6, height: 6, borderRadius: 3 },
   walletText: { fontSize: 11 },
@@ -281,7 +336,17 @@ const styles = StyleSheet.create({
   appName: { fontSize: 52, fontWeight: '900', letterSpacing: 16, opacity: 0.95 },
   tagline: { fontSize: 16, marginTop: 12, letterSpacing: 2 },
   tagline2: { fontSize: 14, marginTop: 4, letterSpacing: 2 },
-  bottomArea: { position: 'absolute', bottom: 48, left: 24, right: 24, alignItems: 'center' },
+  bottomArea: {
+    position: 'absolute', bottom: 48, left: 24, right: 24, alignItems: 'center', gap: 0,
+  },
+  poolBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    borderWidth: 1, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 7,
+    marginBottom: 16,
+  },
+  poolDot: { color: '#fbbf24', fontSize: 8 },
+  poolText: { color: '#fbbf24', fontSize: 11, letterSpacing: 1, opacity: 0.8 },
   startBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 48, paddingVertical: 20, borderRadius: 50,
@@ -296,21 +361,12 @@ const styles = StyleSheet.create({
     padding: 24, paddingBottom: 40,
     borderTopWidth: 1, maxHeight: height * 0.85,
   },
-  handle: {
-    width: 40, height: 4, borderRadius: 2,
-    alignSelf: 'center', marginBottom: 20,
-  },
+  handle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   sheetTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 24 },
   sheetLabel: { fontSize: 10, letterSpacing: 2, marginBottom: 12 },
-  taskInput: {
-    borderWidth: 1, borderRadius: 12, padding: 14,
-    fontSize: 14, marginBottom: 24,
-  },
+  taskInput: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 14, marginBottom: 24 },
   durationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
-  durationBtn: {
-    width: '30%', padding: 14, borderRadius: 12,
-    alignItems: 'center', borderWidth: 1,
-  },
+  durationBtn: { width: '30%', padding: 14, borderRadius: 12, alignItems: 'center', borderWidth: 1 },
   durationNum: { fontSize: 22, fontWeight: '300' },
   durationSub: { fontSize: 10, marginTop: 2 },
   stakeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 28 },
