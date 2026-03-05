@@ -14,7 +14,7 @@ const TABS = [
   { id: 'library',  emoji: '🎵', label: 'Music'    },
   { id: 'home',     emoji: '⚡', label: 'Focus',   center: true },
   { id: 'history',  emoji: '📋', label: 'History'  },
-  { id: 'settings', emoji: '⚙️', label: 'Settings' },
+  { id: 'settings', emoji: '☰',  label: 'Settings' },
 ] as const;
 
 export default function BottomNav({ active, onNavigate }: Props) {
@@ -31,11 +31,20 @@ export default function BottomNav({ active, onNavigate }: Props) {
             onPress={() => onNavigate(tab.id as Screen)}
           >
             {isCenter ? (
-              <View style={[styles.centerBtn, { borderColor: colors.accentDark, backgroundColor: `${colors.accent}22` }, isActive && { borderColor: colors.accent, backgroundColor: `${colors.accent}33` }]}>
+              <View style={[
+                styles.centerBtn,
+                { borderColor: colors.accentDark, backgroundColor: `${colors.accent}22` },
+                isActive && { borderColor: colors.accent, backgroundColor: `${colors.accent}33` },
+              ]}>
                 <Text style={styles.centerEmoji}>{tab.emoji}</Text>
               </View>
             ) : (
-              <Text style={styles.emoji}>{tab.emoji}</Text>
+              <Text style={[
+                styles.emoji,
+                isActive && { color: colors.accent },
+              ]}>
+                {tab.emoji}
+              </Text>
             )}
             <Text style={[styles.label, { color: colors.textMuted }, isActive && { color: colors.accent }]}>
               {tab.label}
@@ -64,7 +73,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     marginBottom: 2,
   },
-  centerEmoji: { fontSize: 24 },
+  centerEmoji: { fontSize: 20 },  // ✅ matched to regular emoji size
   emoji: { fontSize: 20 },
   label: { fontSize: 10, letterSpacing: 1 },
   dot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },

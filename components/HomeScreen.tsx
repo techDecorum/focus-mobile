@@ -1,6 +1,6 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PublicKey } from '@solana/web3.js';
 import { useConnection } from '@solana/wallet-adapter-react';
-import { LAMPORTS_PER_SOL, PublicKey } from '@solana/web3.js';
-import { transact, Web3MobileWallet } from '@solana-mobile/mobile-wallet-adapter-protocol-web3js';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, TextInput,
@@ -10,6 +10,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import AuroraBackground from './AuroraBackground';
 import { useTheme } from '../contexts/ThemeContext';
+import { useWallet } from '../contexts/WalletContext';
+import FirstSessionHint from './FirstSessionHint';
 import { fetchPoolState } from '../mobileVaultClient';
 
 const { height } = Dimensions.get('window');
@@ -20,43 +22,71 @@ const TWEET_TEXT = encodeURIComponent(
 );
 
 interface Props {
-  onStart: (duration: number, stakeAmount: number, publicKey: PublicKey, taskNote: string) => void;
+  onStart: (duration: number, stakeAmount: number, taskNote: string) => void;
   onShowInfo: () => void;
+  hintTrigger?: number;
 }
 
 const DURATIONS = [
   { mins: 1,  label: '1',  sub: 'Quick Start' },
-  { mins: 3,  label: '3',  sub: 'Quick Reset' },
   { mins: 5,  label: '5',  sub: 'Micro Focus' },
   { mins: 15, label: '15', sub: 'Power Block' },
-  { mins: 25, label: '25', sub: 'Pomodoro' },
-  { mins: 50, label: '50', sub: 'Deep Work' },
+  { mins: 30, label: '30', sub: 'Deep Focus' },
+  { mins: 60, label: '60', sub: 'Flow State' },
+  { mins: 90, label: '90', sub: 'Marathon' },
 ];
 
-export default function HomeScreen({ onStart, onShowInfo }: Props) {
-  const { connection } = useConnection();
+export default function HomeScreen({ onStart, onShowInfo, hintTrigger = 0 }: Props) {
   const { theme, colors } = useTheme();
   const c = colors;
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [solBalance, setSolBalance] = useState<number | null>(null);
+  const { connection } = useConnection();
+  const { walletAddress, solBalance, publicKey, connect } = useWallet();
   const [poolBalance, setPoolBalance] = useState<number>(0);
+  const [streak, setStreak] = useState(0);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [duration, setDuration] = useState(25);
   const [stakeAmount, setStakeAmount] = useState(0.01);
   const [taskNote, setTaskNote] = useState('');
   const slideAnim = useRef(new Animated.Value(height)).current;
 
+  // Fetch pool balance once on mount
   useEffect(() => {
+    if (!connection) return;
     fetchPoolState(connection, PROGRAM_ID)
       .then((pool: any) => {
-        console.log('=== POOL STATE ===', JSON.stringify(pool, (key, value) =>
-          typeof value === 'object' && value?.toNumber ? value.toNumber() : value
-        , 2));
         if (pool?.totalBalance) {
           setPoolBalance(pool.totalBalance.toNumber() / 1e9);
         }
       })
       .catch((err) => console.log('=== POOL ERROR ===', err));
+  }, [connection]);
+
+  // Load streak from history
+  useEffect(() => {
+    const loadStreak = async () => {
+      try {
+        const data = await AsyncStorage.getItem('focus_history');
+        if (!data) return;
+        const history = JSON.parse(data);
+        const completedDates = history
+          .filter((h: any) => h.status === 'completed')
+          .map((h: any) => new Date(h.completedAt).toDateString());
+        const uniqueDates = [...new Set(completedDates)] as string[];
+        let count = 0;
+        const today = new Date();
+        for (let i = 0; i < 30; i++) {
+          const d = new Date(today);
+          d.setDate(today.getDate() - i);
+          if (uniqueDates.includes(d.toDateString())) {
+            count++;
+          } else {
+            break;
+          }
+        }
+        setStreak(count);
+      } catch {}
+    };
+    loadStreak();
   }, []);
 
   const openSheet = () => {
@@ -72,41 +102,13 @@ export default function HomeScreen({ onStart, onShowInfo }: Props) {
     }).start(() => setSheetOpen(false));
   };
 
-  const fetchBalance = async (address: string) => {
-    try {
-      let pubkey: PublicKey;
-      try { pubkey = new PublicKey(Buffer.from(address, 'base64')); }
-      catch { pubkey = new PublicKey(address); }
-      const balance = await connection.getBalance(pubkey);
-      setSolBalance(balance / LAMPORTS_PER_SOL);
-    } catch {}
-  };
-
-  const handleConnect = async () => {
-    try {
-      const authResult = await transact(async (wallet: Web3MobileWallet) => {
-        return await wallet.authorize({
-          cluster: 'devnet',
-          identity: { name: 'Focus', uri: 'https://focus-app-orpin.vercel.app', icon: '/favicon.ico' },
-        });
-      });
-      setWalletAddress(authResult.accounts[0].address);
-      fetchBalance(authResult.accounts[0].address);
-    } catch {}
-  };
+  const handleConnect = connect;
 
   const handleBegin = () => {
-    if (!walletAddress) return alert('Connect your Phantom wallet first!');
+    if (!walletAddress || !publicKey) return alert('Connect your Phantom wallet first!');
     if (!taskNote.trim()) return alert('What are you focusing on?');
-    try {
-      const pubkey = new PublicKey(Buffer.from(walletAddress, 'base64'));
-      closeSheet();
-      setTimeout(() => onStart(duration, stakeAmount, pubkey, taskNote.trim()), 350);
-    } catch {
-      const pubkey = new PublicKey(walletAddress);
-      closeSheet();
-      setTimeout(() => onStart(duration, stakeAmount, pubkey, taskNote.trim()), 350);
-    }
+    closeSheet();
+    setTimeout(() => onStart(duration, stakeAmount, taskNote.trim()), 350);
   };
 
   const lightBg = theme === 'light';
@@ -186,7 +188,18 @@ export default function HomeScreen({ onStart, onShowInfo }: Props) {
         <Text style={[styles.tagline2, { color: lightBg ? `${c.accentDark}99` : 'rgba(77,217,172,0.5)' }]}>
           Earn it back.
         </Text>
+        {streak > 0 && (
+          <View style={[styles.streakBadge, {
+            backgroundColor: lightBg ? 'rgba(255,255,255,0.6)' : 'rgba(6,13,18,0.5)',
+            borderColor: 'rgba(251,146,60,0.3)',
+          }]}>
+            <Text style={styles.streakText}>🔥 {streak} day streak</Text>
+          </View>
+        )}
       </View>
+
+      {/* Guided first session hint */}
+      <FirstSessionHint onPress={openSheet} triggerKey={hintTrigger} />
 
       {/* Bottom Area */}
       <View style={styles.bottomArea}>
@@ -336,6 +349,13 @@ const styles = StyleSheet.create({
   appName: { fontSize: 52, fontWeight: '900', letterSpacing: 16, opacity: 0.95 },
   tagline: { fontSize: 16, marginTop: 12, letterSpacing: 2 },
   tagline2: { fontSize: 14, marginTop: 4, letterSpacing: 2 },
+  streakBadge: {
+    flexDirection: 'row', alignItems: 'center',
+    borderWidth: 1, borderRadius: 20,
+    paddingHorizontal: 16, paddingVertical: 8,
+    marginTop: 20,
+  },
+  streakText: { color: '#fb923c', fontSize: 13, fontWeight: '600', letterSpacing: 1 },
   bottomArea: {
     position: 'absolute', bottom: 48, left: 24, right: 24, alignItems: 'center', gap: 0,
   },
