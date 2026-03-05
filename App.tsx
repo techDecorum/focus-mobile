@@ -10,7 +10,7 @@ import { SolanaWalletProvider } from './components/WalletProvider';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { MusicProvider, useMusic } from './contexts/MusicContext';
 import { WalletStateProvider, useWallet } from './contexts/WalletContext';
-import HomeScreen from './components/HomeScreen';
+import HomeScreen, { StakeToken } from './components/HomeScreen';
 import ActiveScreen from './components/ActiveScreen';
 import SuccessScreen from './components/SuccessScreen';
 import AbandonedScreen from './components/AbandonedScreen';
@@ -43,6 +43,7 @@ function AppInner() {
   const [navScreen, setNavScreen] = useState<NavScreen>('home');
   const [duration, setDuration] = useState(25);
   const [stakeAmount, setStakeAmount] = useState(0.01);
+  const [stakeToken, setStakeToken] = useState<StakeToken>('SOL');
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [poolReward, setPoolReward] = useState(0);
   const [taskNote, setTaskNote] = useState('');
@@ -152,10 +153,11 @@ function AppInner() {
       case 'home':
         return (
           <HomeScreen
-            onStart={(dur, stake, task) => {
+            onStart={(dur, stake, task, token) => {
               setDuration(dur);
               setStakeAmount(stake);
               setTaskNote(task);
+              setStakeToken(token);
               setAppScreen('active');
             }}
             onShowInfo={() => setOnboardingOpen(true)}

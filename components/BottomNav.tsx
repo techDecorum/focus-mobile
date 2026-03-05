@@ -14,42 +14,67 @@ const TABS = [
   { id: 'library',  emoji: '🎵', label: 'Music'    },
   { id: 'home',     emoji: '⚡', label: 'Focus',   center: true },
   { id: 'history',  emoji: '📋', label: 'History'  },
-  { id: 'settings', emoji: '☰',  label: 'Settings' },
+  { id: 'settings', emoji: '⚙️', label: 'Settings' },
 ] as const;
 
 export default function BottomNav({ active, onNavigate }: Props) {
-  const { colors } = useTheme();
+  const { colors: c } = useTheme();
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.navBg, borderTopColor: colors.navBorder }]}>
+    <View style={[styles.container, { backgroundColor: c.navBg, borderTopColor: c.navBorder }]}>
       {TABS.map(tab => {
         const isCenter = 'center' in tab && tab.center;
         const isActive = active === tab.id;
-        return (
-          <TouchableOpacity
-            key={tab.id}
-            style={[styles.tab, isCenter && styles.centerTab]}
-            onPress={() => onNavigate(tab.id as Screen)}
-          >
-            {isCenter ? (
+
+        if (isCenter) {
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              style={styles.centerTab}
+              onPress={() => onNavigate(tab.id as Screen)}
+              activeOpacity={0.75}
+            >
               <View style={[
                 styles.centerBtn,
-                { borderColor: colors.accentDark, backgroundColor: `${colors.accent}22` },
-                isActive && { borderColor: colors.accent, backgroundColor: `${colors.accent}33` },
+                { borderColor: c.accentDark, backgroundColor: `${c.accent}18` },
+                isActive && { borderColor: c.accent, backgroundColor: `${c.accent}30` },
               ]}>
                 <Text style={styles.centerEmoji}>{tab.emoji}</Text>
               </View>
-            ) : (
-              <Text style={[
-                styles.emoji,
-                isActive && { color: colors.accent },
-              ]}>
+              {/* FIX 5: larger label, weighted when active */}
+              <Text style={[styles.label, { color: isActive ? c.accent : c.textMuted },
+                isActive && styles.labelActive]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        }
+
+        return (
+          <TouchableOpacity
+            key={tab.id}
+            style={styles.tab}
+            onPress={() => onNavigate(tab.id as Screen)}
+            activeOpacity={0.75}
+          >
+            {/* FIX 5: pill background on active icon so inactive icons look visually distinct */}
+            <View style={[
+              styles.iconWrap,
+              isActive && { backgroundColor: `${c.accent}18`, borderRadius: 14 },
+            ]}>
+              {/* FIX 5: opacity dimming on inactive so active/inactive are clearly different */}
+              <Text style={[styles.emoji, { opacity: isActive ? 1 : 0.45 }]}>
                 {tab.emoji}
               </Text>
-            )}
-            <Text style={[styles.label, { color: colors.textMuted }, isActive && { color: colors.accent }]}>
+            </View>
+            <Text style={[
+              styles.label,
+              { color: isActive ? c.accent : c.textMuted },
+              isActive && styles.labelActive,
+            ]}>
               {tab.label}
             </Text>
-            {isActive && !isCenter && <View style={[styles.dot, { backgroundColor: colors.accent }]} />}
+            {isActive && <View style={[styles.dot, { backgroundColor: c.accent }]} />}
           </TouchableOpacity>
         );
       })}
@@ -61,20 +86,34 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    paddingBottom: 20,
+    paddingBottom: 22,
     paddingTop: 10,
     alignItems: 'flex-end',
   },
-  tab: { flex: 1, alignItems: 'center', gap: 3 },
-  centerTab: { alignItems: 'center', marginTop: -20 },
-  centerBtn: {
-    width: 56, height: 56, borderRadius: 28,
-    borderWidth: 1,
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 2,
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
   },
-  centerEmoji: { fontSize: 20 },  // ✅ matched to regular emoji size
-  emoji: { fontSize: 20 },
-  label: { fontSize: 10, letterSpacing: 1 },
-  dot: { width: 4, height: 4, borderRadius: 2, marginTop: 2 },
+  centerTab: {
+    flex: 1,
+    alignItems: 'center',
+    marginTop: -22,
+    gap: 4,
+  },
+  centerBtn: {
+    width: 58, height: 58, borderRadius: 29,
+    borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  centerEmoji: { fontSize: 22 },
+  iconWrap: {
+    width: 42, height: 34,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  emoji: { fontSize: 22 },
+  // FIX 5: bumped from 10 → 11.5, tightened letter-spacing
+  label: { fontSize: 11.5, letterSpacing: 0.2 },
+  labelActive: { fontWeight: '700' },
+  dot: { width: 4, height: 4, borderRadius: 2, marginTop: 1 },
 });
