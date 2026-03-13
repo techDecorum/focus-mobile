@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
-  ScrollView, Animated, Dimensions, Platform,
+  ScrollView, Animated, Dimensions, Platform, AppState, AppStateStatus,
 } from 'react-native';
 import { Connection, PublicKey } from '@solana/web3.js';
 import Svg, { Circle, Defs, LinearGradient as SvgGrad, Stop } from 'react-native-svg';
@@ -50,21 +50,20 @@ const TRACKS = [
 ];
 
 const QUOTES = [
-  { text: "The successful warrior is the average person, with laser-like focus.",                      author: "Bruce Lee"           },
-  { text: "Deep work is the ability to focus without distraction on a cognitively demanding task.",    author: "Cal Newport"         },
-  { text: "It's not that I'm so smart. I just stay with problems longer.",                            author: "Albert Einstein"     },
-  { text: "Energy flows where attention goes.",                                                        author: ""                    },
-  { text: "You don't rise to the level of your goals. You fall to the level of your systems.",        author: "James Clear"         },
-  { text: "One hour of focused work beats three hours of distracted effort.",                         author: ""                    },
-  { text: "The mind is everything. What you think, you become.",                                      author: "Buddha"              },
-  { text: "Concentrate all your thoughts upon the work at hand.",                                     author: "Alexander Graham Bell"},
-  { text: "The ability to perform deep work is becoming increasingly rare and increasingly valuable.", author: "Cal Newport"         },
-  { text: "Where focus goes, energy flows.",                                                           author: "Tony Robbins"        },
-  { text: "Clarity about what matters provides clarity about what does not.",                         author: "Cal Newport"         },
-  { text: "The secret of getting ahead is getting started.",                                          author: "Mark Twain"          },
+  { text: "The successful warrior is the average person, with laser-like focus.",                      author: "Bruce Lee"            },
+  { text: "Deep work is the ability to focus without distraction on a cognitively demanding task.",    author: "Cal Newport"          },
+  { text: "It's not that I'm so smart. I just stay with problems longer.",                            author: "Albert Einstein"      },
+  { text: "Energy flows where attention goes.",                                                        author: ""                     },
+  { text: "You don't rise to the level of your goals. You fall to the level of your systems.",        author: "James Clear"          },
+  { text: "One hour of focused work beats three hours of distracted effort.",                         author: ""                     },
+  { text: "The mind is everything. What you think, you become.",                                      author: "Buddha"               },
+  { text: "Concentrate all your thoughts upon the work at hand.",                                     author: "Alexander Graham Bell" },
+  { text: "The ability to perform deep work is becoming increasingly rare and increasingly valuable.", author: "Cal Newport"          },
+  { text: "Where focus goes, energy flows.",                                                           author: "Tony Robbins"         },
+  { text: "Clarity about what matters provides clarity about what does not.",                         author: "Cal Newport"          },
+  { text: "The secret of getting ahead is getting started.",                                          author: "Mark Twain"           },
 ];
 
-// ─── SVG progress ring with gradient stroke ───────────────────────────────────
 function ProgressRing({ progress, urgent }: { progress: number; urgent: boolean }) {
   const SIZE   = 248;
   const SW     = 6;
@@ -72,7 +71,6 @@ function ProgressRing({ progress, urgent }: { progress: number; urgent: boolean 
   const circ   = 2 * Math.PI * radius;
   const offset = circ * (1 - Math.min(progress, 100) / 100);
 
-  // Gentle pulse when urgent
   const pulse = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (!urgent) { pulse.setValue(1); return; }
@@ -88,17 +86,15 @@ function ProgressRing({ progress, urgent }: { progress: number; urgent: boolean 
 
   return (
     <Animated.View style={{ width: SIZE, height: SIZE, transform: [{ scale: pulse }] }}>
-      {/* Track */}
       <Svg width={SIZE} height={SIZE} style={StyleSheet.absoluteFill}>
         <Circle cx={SIZE/2} cy={SIZE/2} r={radius}
           stroke="rgba(77,217,172,0.07)" strokeWidth={SW} fill="none" />
       </Svg>
-      {/* Fill */}
       <Svg width={SIZE} height={SIZE} style={[StyleSheet.absoluteFill, { transform: [{ rotate: '-90deg' }] }]}>
         <Defs>
           <SvgGrad id="pg" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0"   stopColor={urgent ? '#dc2626' : '#1a5c46'} />
-            <Stop offset="1"   stopColor={urgent ? '#f87171' : '#4dd9ac'} />
+            <Stop offset="0" stopColor={urgent ? '#dc2626' : '#1a5c46'} />
+            <Stop offset="1" stopColor={urgent ? '#f87171' : '#4dd9ac'} />
           </SvgGrad>
         </Defs>
         <Circle cx={SIZE/2} cy={SIZE/2} r={radius}
@@ -115,16 +111,19 @@ export default function ActiveScreen({
   duration, stakeAmount, publicKey, connection, taskNote, onComplete, onAbandon,
 }: Props) {
   const { colors } = useTheme();
-  const c = colors;
 
   const [timeLeft,       setTimeLeft]       = useState(duration * 60);
   const [loading,        setLoading]        = useState(true);
   const [sessionStarted, setSessionStarted] = useState(false);
   const [showTracks,     setShowTracks]     = useState(false);
   const [quoteIndex,     setQuoteIndex]     = useState(() => Math.floor(Math.random() * QUOTES.length));
+  const [completeFailed, setCompleteFailed] = useState(false);
 
-  const quoteOpacity = useRef(new Animated.Value(1)).current;
-  const enterAnim    = useRef(new Animated.Value(0)).current;
+  const quoteOpacity   = useRef(new Animated.Value(1)).current;
+  const enterAnim      = useRef(new Animated.Value(0)).current;
+  const appStateRef    = useRef(AppState.currentState);
+  const backgroundedAt = useRef<number | null>(null);
+  const completedRef   = useRef(false);
 
   const { trackIndex, setTrackIndex, next: musicNext, prev: musicPrev, isPlaying, play } = useMusic();
 
@@ -137,13 +136,13 @@ export default function ActiveScreen({
   const fmt = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
-  // Entrance
+  // ── Entrance ───────────────────────────────────────────────────────────────
   useEffect(() => {
     Animated.spring(enterAnim, { toValue: 1, tension: 55, friction: 11, useNativeDriver: true }).start();
     handleStart();
   }, []);
 
-  // Quote rotation
+  // ── Quote rotation ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!sessionStarted) return;
     const iv = setInterval(() => {
@@ -156,30 +155,75 @@ export default function ActiveScreen({
     return () => clearInterval(iv);
   }, [sessionStarted]);
 
-  // Countdown
+  // ── Countdown ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!sessionStarted) return;
-    if (timeLeft <= 0) { handleComplete(); return; }
+    if (timeLeft <= 0) {
+      if (!completedRef.current) {
+        completedRef.current = true;
+        handleComplete();
+      }
+      return;
+    }
     const t = setInterval(() => setTimeLeft(p => p - 1), 1000);
     return () => clearInterval(t);
   }, [sessionStarted, timeLeft]);
+
+  // ── AppState ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (appStateRef.current === 'active' && nextState === 'background') {
+        backgroundedAt.current = Date.now();
+      }
+      if (appStateRef.current === 'background' && nextState === 'active') {
+        if (backgroundedAt.current && sessionStarted) {
+          const elapsed = Math.floor((Date.now() - backgroundedAt.current) / 1000);
+          setTimeLeft(prev => {
+            const newTime = prev - elapsed;
+            if (newTime <= 0) {
+              if (!completedRef.current) {
+                completedRef.current = true;
+                handleComplete();
+              }
+              return 0;
+            }
+            return newTime;
+          });
+        }
+        backgroundedAt.current = null;
+      }
+      appStateRef.current = nextState;
+    });
+    return () => sub.remove();
+  }, [sessionStarted]);
 
   // ── Blockchain ─────────────────────────────────────────────────────────────
   const handleStart = async () => {
     setLoading(true);
     try {
-      try { await initializeVault(connection, publicKey); } catch {}
+      console.log('=== STEP 1: initializeVault ===');
+      try { await initializeVault(connection, publicKey); } catch (e: any) {
+        console.log('=== initializeVault failed (ok):', e.message);
+      }
+
+      console.log('=== STEP 2: startSession ===');
       try {
         await startSession(connection, publicKey, stakeAmount, duration * 60);
+        console.log('=== STEP 2 SUCCESS ===');
         setSessionStarted(true);
       } catch (e: any) {
+        console.log('=== startSession error:', e.message);
         if (e.message?.includes('SessionAlreadyActive') || e.message?.includes('0x1770')) {
+          console.log('=== STEP 3: abandonSession ===');
           await abandonSession(connection, publicKey);
+          console.log('=== STEP 4: startSession retry ===');
           await startSession(connection, publicKey, stakeAmount, duration * 60);
+          console.log('=== STEP 4 SUCCESS ===');
           setSessionStarted(true);
         } else throw e;
       }
     } catch (err: any) {
+      console.log('=== FATAL ERROR:', err.message);
       Alert.alert('Could not start session', 'Please go back and try again.', [
         { text: 'Go Back', onPress: () => onAbandon('cancelled') },
       ]);
@@ -188,6 +232,7 @@ export default function ActiveScreen({
 
   const handleComplete = async () => {
     setLoading(true);
+    setCompleteFailed(false);
     try {
       const vb  = await fetchVaultState(connection, publicKey);
       const sig = await completeSession(connection, publicKey);
@@ -211,7 +256,12 @@ export default function ActiveScreen({
       }
       onComplete(sig, reward);
     } catch (err: any) {
-      Alert.alert('Error', `Failed to complete: ${err.message}`);
+      setCompleteFailed(true);
+      Alert.alert(
+        'Could not collect SOL',
+        'Network issue detected. Make sure Phantom is set to Devnet, then tap Retry.',
+        [{ text: 'OK' }]
+      );
     } finally { setLoading(false); }
   };
 
@@ -243,15 +293,11 @@ export default function ActiveScreen({
 
   const track = TRACKS[trackIndex];
   const quote = QUOTES[quoteIndex];
-
   const RING_SIZE = 248;
 
   return (
     <View style={s.container}>
-
-      {/* Soft ambient glow behind ring */}
       <View style={[s.ambientGlow, urgent && s.ambientGlowUrgent]} />
-
       <Animated.View style={[
         s.inner,
         {
@@ -259,8 +305,6 @@ export default function ActiveScreen({
           transform: [{ translateY: enterAnim.interpolate({ inputRange: [0,1], outputRange: [20,0] }) }],
         },
       ]}>
-
-        {/* ── Top bar: status + stake ──────────────────────────────────────── */}
         <View style={s.topBar}>
           <View style={s.statusPill}>
             <Animated.View style={[s.statusDot, urgent && s.statusDotUrgent]} />
@@ -274,7 +318,6 @@ export default function ActiveScreen({
           </View>
         </View>
 
-        {/* ── Task ─────────────────────────────────────────────────────────── */}
         {!!taskNote && (
           <View style={s.taskRow}>
             <Text style={s.taskEmoji}>🎯</Text>
@@ -282,10 +325,8 @@ export default function ActiveScreen({
           </View>
         )}
 
-        {/* Flex spacer above ring — 1 part above, 2 parts below = ring at ~1/3 */}
         <View style={{ flex: 1 }} />
 
-        {/* ── Ring ─────────────────────────────────────────────────────────── */}
         <View style={s.timerSection}>
           <View style={[s.ringWrap, { width: RING_SIZE, height: RING_SIZE }]}>
             <ProgressRing progress={progress} urgent={urgent} />
@@ -294,9 +335,7 @@ export default function ActiveScreen({
                 <Text style={s.startingLabel}>Starting…</Text>
               ) : (
                 <>
-                  <Text style={[s.timerText, urgent && s.timerUrgent]}>
-                    {fmt(timeLeft)}
-                  </Text>
+                  <Text style={[s.timerText, urgent && s.timerUrgent]}>{fmt(timeLeft)}</Text>
                   <Text style={s.timerSub}>{duration} min</Text>
                 </>
               )}
@@ -304,13 +343,9 @@ export default function ActiveScreen({
           </View>
         </View>
 
-        {/* Flex spacer below ring — larger so ring sits above centre */}
         <View style={{ flex: 2 }} />
 
-        {/* ── Bottom section ────────────────────────────────────────────────── */}
         <View style={s.bottomSection}>
-
-          {/* Music pill */}
           <View style={s.musicRow}>
             <TouchableOpacity onPress={musicPrev} disabled={!sessionStarted} style={s.musicArrow}>
               <Text style={s.musicArrowTxt}>‹</Text>
@@ -333,7 +368,6 @@ export default function ActiveScreen({
             </TouchableOpacity>
           </View>
 
-          {/* Track picker */}
           {showTracks && (
             <ScrollView style={s.trackList} showsVerticalScrollIndicator={false}>
               {TRACKS.map(t => (
@@ -348,9 +382,7 @@ export default function ActiveScreen({
                 >
                   <Text style={s.trackEmoji}>{t.emoji}</Text>
                   <View style={{ flex: 1 }}>
-                    <Text style={[s.trackName, trackIndex === t.index && s.trackNameActive]}>
-                      {t.name}
-                    </Text>
+                    <Text style={[s.trackName, trackIndex === t.index && s.trackNameActive]}>{t.name}</Text>
                     <Text style={s.trackDesc}>{t.description}</Text>
                   </View>
                   {trackIndex === t.index && <Text style={s.trackCheck}>✓</Text>}
@@ -359,16 +391,31 @@ export default function ActiveScreen({
             </ScrollView>
           )}
 
-          {/* Quote */}
           {!showTracks && (
             <Animated.View style={[s.quoteBlock, { opacity: quoteOpacity }]}>
-              <Text style={s.quoteMark}>“</Text>
+              <Text style={s.quoteMark}>"</Text>
               <Text style={s.quoteText}>{quote.text}</Text>
               {!!quote.author && <Text style={s.quoteAuthor}>— {quote.author}</Text>}
             </Animated.View>
           )}
 
-          {/* Abandon */}
+          {completeFailed && !showTracks && (
+            <TouchableOpacity
+              onPress={() => {
+                completedRef.current = false;
+                handleComplete();
+              }}
+              style={s.retryBtn}
+              activeOpacity={0.75}
+            >
+              <Text style={s.retryIcon}>↻</Text>
+              <View>
+                <Text style={s.retryText}>Retry Collecting SOL</Text>
+                <Text style={s.retrySub}>Switch Phantom to Devnet first</Text>
+              </View>
+            </TouchableOpacity>
+          )}
+
           {!showTracks && (
             <TouchableOpacity
               onPress={handleAbandon}
@@ -382,25 +429,22 @@ export default function ActiveScreen({
               </View>
             </TouchableOpacity>
           )}
-
         </View>
-
       </Animated.View>
     </View>
   );
 }
 
-// ─── Design tokens ────────────────────────────────────────────────────────────
-const A  = '#4dd9ac';           // accent green
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const A  = '#4dd9ac';
 const AD = 'rgba(77,217,172,0.5)';
-const T  = '#dff5ec';           // primary text
-const M  = 'rgba(223,245,236,0.3)'; // muted text
-const CB = 'rgba(77,217,172,0.08)'; // card bg
-const CE = 'rgba(77,217,172,0.13)'; // card border
+const T  = '#dff5ec';
+const M  = 'rgba(223,245,236,0.3)';
+const CB = 'rgba(77,217,172,0.08)';
+const CE = 'rgba(77,217,172,0.13)';
 
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#020814' },
-
   ambientGlow: {
     position: 'absolute',
     top: height * 0.18, left: width / 2 - 140,
@@ -410,17 +454,11 @@ const s = StyleSheet.create({
     shadowOpacity: 0.18, shadowRadius: 90,
   },
   ambientGlowUrgent: { shadowColor: '#f87171', shadowOpacity: 0.22 },
-
   inner: {
-    flex: 1,
-    paddingHorizontal: 22,
+    flex: 1, paddingHorizontal: 22,
     paddingTop: Platform.OS === 'ios' ? 58 : 44,
-    paddingBottom: 28,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
+    paddingBottom: 28, alignItems: 'center', justifyContent: 'flex-start',
   },
-
-  // top bar
   topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 18 },
   statusPill: {
     flexDirection: 'row', alignItems: 'center', gap: 7,
@@ -438,17 +476,8 @@ const s = StyleSheet.create({
   },
   stakeLock: { fontSize: 11 },
   stakeAmt: { fontSize: 12, color: '#fbbf24', fontWeight: '600', letterSpacing: 0.3 },
-
-  // layout sections
-  timerSection: {
-    width: '100%', alignItems: 'center',
-  },
-  bottomSection: {
-    width: '100%',
-    paddingBottom: 4,
-  },
-
-  // task
+  timerSection: { width: '100%', alignItems: 'center' },
+  bottomSection: { width: '100%', paddingBottom: 4 },
   taskRow: {
     flexDirection: 'row', alignItems: 'center', gap: 9,
     borderWidth: 1, borderColor: CE, borderRadius: 12,
@@ -457,19 +486,12 @@ const s = StyleSheet.create({
   },
   taskEmoji: { fontSize: 14 },
   taskText: { flex: 1, color: A, fontSize: 13, fontStyle: 'italic', fontWeight: '500' },
-
-  // ring
-  ringWrap: { alignItems: 'center', justifyContent: 'center', marginBottom: 0 },
+  ringWrap: { alignItems: 'center', justifyContent: 'center' },
   ringCenter: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   startingLabel: { color: AD, fontSize: 14 },
-  timerText: {
-    fontSize: 70, fontWeight: '100', letterSpacing: -4,
-    color: T, fontVariant: ['tabular-nums'],
-  },
+  timerText: { fontSize: 70, fontWeight: '100', letterSpacing: -4, color: T, fontVariant: ['tabular-nums'] },
   timerUrgent: { color: '#f87171' },
   timerSub: { fontSize: 10, color: M, letterSpacing: 1.5, marginTop: 2, textTransform: 'uppercase' },
-
-  // music
   musicRow: { flexDirection: 'row', alignItems: 'center', gap: 6, width: '100%', marginBottom: 18 },
   musicArrow: { paddingHorizontal: 4, paddingVertical: 10 },
   musicArrowTxt: { fontSize: 30, color: M, fontWeight: '100', lineHeight: 32 },
@@ -482,8 +504,6 @@ const s = StyleSheet.create({
   musicName: { fontSize: 12, color: A, fontWeight: '600' },
   musicDesc: { fontSize: 10, color: M, marginTop: 1 },
   musicChevron: { fontSize: 9, color: M },
-
-  // tracks
   trackList: {
     width: '100%', maxHeight: 230,
     borderWidth: 1, borderColor: CE, borderRadius: 14,
@@ -500,14 +520,19 @@ const s = StyleSheet.create({
   trackNameActive: { color: A },
   trackDesc: { fontSize: 10, color: 'rgba(223,245,236,0.18)', marginTop: 1 },
   trackCheck: { fontSize: 13, color: A },
-
-  // quote
   quoteBlock: { alignItems: 'center', paddingHorizontal: 16, marginBottom: 20, width: '100%' },
   quoteMark: { fontSize: 28, color: 'rgba(77,217,172,0.1)', fontWeight: '900', lineHeight: 22, marginBottom: 2 },
   quoteText: { fontSize: 12, color: 'rgba(223,245,236,0.28)', textAlign: 'center', fontStyle: 'italic', lineHeight: 19 },
   quoteAuthor: { fontSize: 10, color: 'rgba(223,245,236,0.16)', textAlign: 'center', marginTop: 5, letterSpacing: 0.4 },
-
-  // abandon
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderWidth: 1, borderColor: 'rgba(251,191,36,0.3)', borderRadius: 14,
+    paddingVertical: 14, paddingHorizontal: 18, width: '100%',
+    backgroundColor: 'rgba(251,191,36,0.06)', marginBottom: 12,
+  },
+  retryIcon: { fontSize: 22, color: '#fbbf24' },
+  retryText: { fontSize: 13, color: '#fbbf24', fontWeight: '600' },
+  retrySub: { fontSize: 10, color: 'rgba(251,191,36,0.5)', marginTop: 2 },
   abandonBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
     borderWidth: 1, borderColor: 'rgba(248,113,113,0.12)', borderRadius: 14,

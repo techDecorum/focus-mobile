@@ -22,7 +22,7 @@ export const SKR_MINT = new PublicKey('SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZh
 export type StakeToken = 'SOL' | 'SKR';
 
 const TWEET_TEXT = encodeURIComponent(
-  `🧠 Just discovered Focus — the app that makes you stake SOL to stay focused.\n\nComplete your session → full refund.\nAbandon early → lose 20%.\n\nBuilt on @Solana ⚡\n\nhttps://focus-app-orpin.vercel.app`
+  `🧠 Just discovered SolFocus — the app that makes you stake SOL to stay focused.\n\nComplete your session → full refund.\nAbandon early → lose 20%.\n\nBuilt on @Solana ⚡\n\nhttps://focus-app-orpin.vercel.app`
 );
 
 // ─── SKR stake amounts (in SKR — much larger numbers than SOL) ────────────────
@@ -256,7 +256,7 @@ export default function HomeScreen({ onStart, onShowInfo, hintTrigger = 0 }: Pro
 
       {/* Center */}
       <View style={styles.center}>
-        <Text style={[styles.appName, { color: lightBg ? '#0a2018' : '#f0faf6' }]}>FOCUS</Text>
+        <Text style={[styles.appName, { color: lightBg ? '#0a2018' : '#f0faf6' }]}>SOLFOCUS</Text>
         <Text style={[styles.tagline, { color: lightBg ? c.accentDark : 'rgba(77,217,172,0.7)' }]}>
           Stake your attention.
         </Text>
