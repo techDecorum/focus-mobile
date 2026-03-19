@@ -1,0 +1,45 @@
+{
+  "schema_version": "0.1",
+  "assets": {
+    "media/app-release.apk": {
+      "path": "media/app-release.apk",
+      "sha256": "8x3h74HHKRYFbw7SZ0RyJq9Sqtb3FFg0aq/wTOEnzdk=",
+      "uri": "https://dappstorecontent.com/TDCUbaDdos5UXzimdE0kYlDLwfkvawB5Jk16hdv1nVY"
+    },
+    "media/icon.png": {
+      "path": "media/icon.png",
+      "sha256": "tqG99RdHIBcwagjMujwW/+SgSbeRK1nKrXr8SXQgQG4=",
+      "uri": "https://dappstorecontent.com/wupVHdBgJQ3Cym72tKbcj2xz_Rx0R2QFkp_sYdahHo4"
+    },
+    "media/banner.png": {
+      "path": "media/banner.png",
+      "sha256": "x4mSPVoAb8p8DAHVMu0rJny0ObDO9vnd6PH3K8QKJrY=",
+      "uri": "https://dappstorecontent.com/ggGIrsMGIgdpNy7TIZtZpExG4IP5IK44qAx0I0gX8cc"
+    },
+    "media/feature.png": {
+      "path": "media/feature.png",
+      "sha256": "GVeYhasnnulYvMg2kMpAHac7aNg6TvqfPF5ZRI6usLs=",
+      "uri": "https://dappstorecontent.com/4BzvNn_byOzwEFmUFfHkLvPsHXMhVPmn0ATCW53jwoQ"
+    },
+    "media/solfocus_home.png": {
+      "path": "media/solfocus_home.png",
+      "sha256": "qAcIOJUUt4a1nLXaFGmlzdbHJDc6c7QPncENQtoNiOA=",
+      "uri": "https://dappstorecontent.com/E1DDijYT37ssAFMhI2ZMoUr_fe6tSC9gS5UFSZvOaM4"
+    },
+    "media/solfocus_newsession.png": {
+      "path": "media/solfocus_newsession.png",
+      "sha256": "49zi5HYP0BiZXjIfoFnVQWbcZBsS3OiEtukg5vphRQc=",
+      "uri": "https://dappstorecontent.com/NypmWkzE-A3WaNhBCQ2_ppj-gfjGCBjtUr513WKMmpU"
+    },
+    "media/solfocus_activesession.png": {
+      "path": "media/solfocus_activesession.png",
+      "sha256": "F4r2NRtBPiHxOvbmawN/7ZDClP7Dn5VmvgpcjU9ioIQ=",
+      "uri": "https://dappstorecontent.com/CdHUYihGDSU5KwAh4XTwZUvnBe5E_fUCAsM6Koim03A"
+    },
+    "media/solfocus_sounds.png": {
+      "path": "media/solfocus_sounds.png",
+      "sha256": "eKrJSktzEDX3hCMKB5P2h92kihx47DR7yrugrEJ+zvw=",
+      "uri": "https://dappstorecontent.com/YHlgxwRb1PoGYDR6oKzExiu5G6UXjstj5AhJQI1UIqw"
+    }
+  }
+}

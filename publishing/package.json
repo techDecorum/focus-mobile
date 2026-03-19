@@ -11,6 +11,6 @@
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
-    "@solana-mobile/dapp-store-cli": "^0.15.0"
+    "@solana-mobile/dapp-store-cli": "^0.16.0"
   }
 }

@@ -1,60 +1,69 @@
 publisher:
-  name: <<[REQUIRED] YOUR_PUBLISHER_NAME>>
-  website: <<[REQUIRED] URL_OF_PUBLISHER_WEBSITE>>
-  email: <<[REQUIRED] EMAIL_ADDRESS_TO_CONTACT_PUBLISHER>>
-  support_email: <<[Optional] SUPPORT_EMAIL_ADDRESS_FOR_END_USERS>>
+  name: CryptoDecorum
+  website: https://focus-app-orpin.vercel.app
+  email: mobaddicts@gmail.com
+  support_email: mobaddicts@gmail.com
 app:
-  name: <<[REQUIRED] APP_NAME>>
-  address: ''
-  android_package: <<[REQUIRED] ANDROID_PACKAGE_NAME>>
+  name: SolFocus
+  address: E43wNjU4ktKLM2HCZfcBGFredtaSxRpfS2hbFhmu1zQU
+  android_package: com.techdecorum.focus
   urls:
-    license_url: <<[REQUIRED] URL For App's T&C. Don't put placeholder urls.>>
-    copyright_url: <<[REQUIRED] URL For App's Copyright. Don't put placeholder urls.>>
-    privacy_policy_url: <<[REQUIRED] URL For App's Privacy Policy. Don't put placeholder urls.>>
-    website: <<[REQUIRED] URL_OF_APP_WEBSITE>>
+    license_url: https://www.termsfeed.com/live/b57c8a4c-c024-4af6-b0a0-0eeaf279cc7e
+    copyright_url: https://www.termsfeed.com/live/b57c8a4c-c024-4af6-b0a0-0eeaf279cc7e
+    privacy_policy_url: https://www.termsfeed.com/live/774af5ab-6977-40db-9cee-5729e8efa9f3
+    website: https://focus-app-orpin.vercel.app
   media:
     - purpose: icon
-      uri: <<[REQUIRED] RELATIVE_PATH_TO_APP_ICON>>
+      uri: media/icon.png
 release:
-  address: ''
+  address: D4ET3sVVfBUozhwFTSTUKo2psrFzsoAaziY9PrGz7rkk
   media:
     - purpose: icon
-      uri: <<[REQUIRED] RELATIVE_PATH_TO_RELEASE_ICON>>
+      uri: media/icon.png
     - purpose: banner
-      uri: <<[REQUIRED] RELATIVE_PATH_TO_BANNER>>
+      uri: media/banner.png
     - purpose: featureGraphic
-      uri: <<[Optional] RELATIVE_PATH_TO_FEATURE_GRAPHIC>>
+      uri: media/feature.png
     - purpose: screenshot
-      uri: <<[REQUIRED] RELATIVE_PATH_TO_SCREENSHOT1>>
+      uri: media/solfocus_home.png
     - purpose: screenshot
-      uri: <<[REQUIRED] RELATIVE_PATH_TO_SCREENSHOT2>>
+      uri: media/solfocus_newsession.png
     - purpose: screenshot
-      uri: <<[REQUIRED] RELATIVE_PATH_TO_SCREENSHOT3>>
+      uri: media/solfocus_activesession.png
     - purpose: screenshot
-      uri: <<[REQUIRED] RELATIVE_PATH_TO_SCREENSHOT4>>
-    - purpose: video
-      uri: <<[Optional] RELATIVE_PATH_TO_VIDEO1>>
+      uri: media/solfocus_sounds.png
   files:
     - purpose: install
-      uri: <<[REQUIRED] RELATIVE_PATH_TO_APK>>
+      uri: media/app-release.apk
   catalog:
     en-US:
-      name: <<[REQUIRED] APP_NAME>>
-      short_description: <<[REQUIRED] SHORT_APP_DESCRIPTION>>
-      long_description: <<[REQUIRED] LONG_APP_DESCRIPTION>>
-      new_in_version: <<[REQUIRED] WHATS_NEW_IN_THIS_VERSION>>
-      saga_features: <<[Optional.] ANY_FEATURES_ONLY_AVAILBLE_WHEN_RUNNING_ON_SAGA>>
+      name: SolFocus
+      short_description: Stake SOL. Focus. Earn back.
+      long_description: |
+        SolFocus is a productivity app built on Solana.
+
+        Stake SOL before each focus session. Complete your session and get a
+        full refund. Abandon early and forfeit 20% to the community penalty pool.
+
+        Features:
+        - 19 binaural beats and ambient music tracks
+        - Session history with task notes and SOL tracking
+        - Daily streak tracking
+        - Solana wallet integration via Mobile Wallet Adapter
+        - Dark and light theme support
+      new_in_version: Initial release of SolFocus on the Solana dApp Store.
   android_details:
+    cert_fingerprint: fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c
+    min_sdk: 24
+    version: 1.1.0
+    version_code: 2
     locales:
       - en-US
-      - <Add more supported locales>
 solana_mobile_dapp_publisher_portal:
-  google_store_package: <<[Optional] ANDROID_PACKAGE_NAME_OF_GOOGLE_PLAY_STORE_VERSION>>
-  testing_instructions: >-
-    <<[REQUIRED] TESTING_INSTRUCTIONS. Please provide any test account details
-    if applicable>>
-  alpha_testers:
-    - address: <<Optional. genesis token wallet address>>
-      comment: <<Optional. For internal use only>>
-    - address: <<Optional. genesis token wallet address>>
-      comment: <<Optional. For internal use only>>
+  testing_instructions: Install the Phantom wallet app and set it to Devnet. Open SolFocus, connect your Phantom wallet, enter a task note, select a duration and stake amount, then tap Begin Session. Complete the session timer to receive your SOL back. You will need a small amount of devnet SOL to test staking functionality.
+lastSubmittedVersionOnChain:
+  address: D4ET3sVVfBUozhwFTSTUKo2psrFzsoAaziY9PrGz7rkk
+  version_code: 2
+  apk_hash: 8x3h74HHKRYFbw7SZ0RyJq9Sqtb3FFg0aq/wTOEnzdk=
+lastUpdatedVersionOnStore:
+  address: D4ET3sVVfBUozhwFTSTUKo2psrFzsoAaziY9PrGz7rkk
